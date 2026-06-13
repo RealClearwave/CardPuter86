@@ -559,6 +559,7 @@ void loop() {
 
         // Scan Cardputer keyboard matrix
         cardputer_update();
+        cardputer_display_update_mode_button();
         cardputer_kbd_fill_keymap();
 
         handleinput();

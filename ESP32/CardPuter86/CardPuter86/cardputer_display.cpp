@@ -16,6 +16,16 @@ unsigned char *gb_frame_buffer = NULL;
 // TFT sprite for double-buffered output (240x135)
 LGFX_Sprite *gb_tft_sprite = NULL;
 
+enum CardputerDisplayMode {
+    DISPLAY_MODE_TEXT,
+    DISPLAY_MODE_GRAPHICS
+};
+
+static CardputerDisplayMode display_mode = DISPLAY_MODE_TEXT;
+static bool g0_raw_pressed = false;
+static bool g0_stable_pressed = false;
+static unsigned long g0_changed_at = 0;
+
 // ===============================================
 // Convert 6-bit VGA color (2bpc: RRGGBB) to RGB565
 // ===============================================
@@ -100,6 +110,7 @@ void cardputer_display_init(void) {
 
     M5Cardputer.Display.setRotation(1);
     M5Cardputer.Display.fillScreen(TFT_BLACK);
+    pinMode(USER_BTN_PIN, INPUT_PULLUP);
 
     int dw = M5Cardputer.Display.width();
     int dh = M5Cardputer.Display.height();
@@ -176,11 +187,11 @@ void cardputer_display_clear(unsigned char color_index) {
 }
 
 // ===============================================
-// Blit 320x200 framebuffer → TFT
-// 1:1 pixel mapping, shows top-left 240x135 area of the 320x200 framebuffer.
-// No scaling — each CGA pixel = one physical pixel on the 1.14" TFT.
+// Blit the emulator framebuffer to the Cardputer display.
+// Text mode preserves 1:1 pixels where possible and only compresses dimensions
+// that exceed the LCD. Graphics mode always fits the complete 320x200 frame.
 // ===============================================
-void tft_blit_scaled(void) {
+void tft_blit_scaled(bool emulated_graphics_mode) {
     if (!gb_frame_buffer) return;
     if (!gb_tft_sprite) return;
 
@@ -190,12 +201,54 @@ void tft_blit_scaled(void) {
     int dw = gb_tft_sprite->width();
     int dh = gb_tft_sprite->height();
 
-    // 1:1 copy from framebuffer top-left corner
+    const bool fit_full_frame = display_mode == DISPLAY_MODE_GRAPHICS;
+    int source_w = FAKE86_FB_W;
+    int source_h = FAKE86_FB_H;
+    const unsigned short int *palette = emulated_graphics_mode
+        ? gb_palette_rgb565
+        : gb_palette_text_rgb565;
+
+    if (!fit_full_frame) {
+        source_w = dw;
+        source_h = 1;
+
+        // Keep normal text crisp. Expand the sampled area only when text is
+        // present outside the LCD's native 240-pixel width or below its height.
+        for (int y = 0; y < FAKE86_FB_H; y++) {
+            const unsigned char *src = gb_frame_buffer + y * FAKE86_FB_W;
+            bool row_used = false;
+            for (int x = 0; x < FAKE86_FB_W; x++) {
+                if ((src[x] & 0x0F) != 0) {
+                    row_used = true;
+                    if (x >= dw) source_w = FAKE86_FB_W;
+                }
+            }
+            if (row_used) source_h = y + 1;
+        }
+
+        // Text glyphs are eight pixels high; include their complete final row.
+        source_h = ((source_h + 7) / 8) * 8;
+        if (source_h > FAKE86_FB_H) source_h = FAKE86_FB_H;
+    }
+
+    const int output_h = source_h < dh ? source_h : dh;
+
     for (int y = 0; y < dh; y++) {
-        unsigned char *src = gb_frame_buffer + (y * FAKE86_FB_W);
         unsigned short int *dst = sprite_buf + (y * dw);
+        if (!fit_full_frame && y >= output_h) {
+            memset(dst, 0, dw * sizeof(*dst));
+            continue;
+        }
+
+        const int src_y = (source_h <= dh)
+            ? y
+            : (y * (source_h - 1) / (dh - 1));
+        const unsigned char *src = gb_frame_buffer + src_y * FAKE86_FB_W;
         for (int x = 0; x < dw; x++) {
-            dst[x] = gb_palette_rgb565[src[x] & 0x0F];
+            const int src_x = (source_w <= dw)
+                ? x
+                : (x * (source_w - 1) / (dw - 1));
+            dst[x] = palette[src[src_x] & 0x0F];
         }
     }
 
@@ -207,6 +260,25 @@ void tft_blit_scaled(void) {
 // ===============================================
 void cardputer_update(void) {
     M5Cardputer.update();
+}
+
+void cardputer_display_update_mode_button(void) {
+    const unsigned long now = millis();
+    const bool pressed = digitalRead(USER_BTN_PIN) == LOW;
+
+    if (pressed != g0_raw_pressed) {
+        g0_raw_pressed = pressed;
+        g0_changed_at = now;
+    }
+
+    if ((now - g0_changed_at) >= 30 && pressed != g0_stable_pressed) {
+        g0_stable_pressed = pressed;
+        if (pressed) {
+            display_mode = display_mode == DISPLAY_MODE_TEXT
+                ? DISPLAY_MODE_GRAPHICS
+                : DISPLAY_MODE_TEXT;
+        }
+    }
 }
 
 // ===============================================

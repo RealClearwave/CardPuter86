@@ -438,7 +438,10 @@ void draw() {
     }
 
     // Blit framebuffer to TFT
-    tft_blit_scaled();
+    const bool graphics_mode = !(
+        vidmode == 0 || vidmode == 1 || vidmode == 2 || vidmode == 3 ||
+        vidmode == 7 || vidmode == 0x82);
+    tft_blit_scaled(graphics_mode);
 }
 
 // ===============================================

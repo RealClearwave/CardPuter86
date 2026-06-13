@@ -21,7 +21,7 @@ El script `flash.sh` del directorio principal también compila, detecta el puert
 
 ## Controles
 
-Las teclas normales del Cardputer corresponden a las teclas del PC. La tecla Aa corresponde a Caps Lock, mientras que Ctrl y Alt funcionan como modificadores. Opt es la capa de funciones de CardPuter86: Opt+1 hasta Opt+0 envían F1-F10, Opt+- envía F11 y Opt+= envía F12. Fn y G0 quedan reservados para funciones futuras.
+Las teclas normales del Cardputer corresponden a las teclas del PC. La tecla Aa corresponde a Caps Lock, mientras que Ctrl y Alt funcionan como modificadores. Opt es la capa de funciones de CardPuter86: Opt+1 hasta Opt+0 envían F1-F10, Opt+- envía F11 y Opt+= envía F12. Fn queda reservado. G0 cambia entre la visualización de texto adaptable predeterminada y el escalado gráfico a pantalla completa.
 
 ## Software integrado
 
