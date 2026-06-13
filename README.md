@@ -1,16 +1,61 @@
-# ESP32TinyFake86
-Port Fake86 to TTGO VGA32
+# CardPuter86
 
-<center><img src='https://raw.githubusercontent.com/rpsubc8/ESP32TinyFake86/main/preview/previewManiacMansion.gif'></center>
-<ul>
- <li><b>Discord: </b><a href='https://discord.gg/2PA97ktmEf'>https://discord.gg/2PA97ktmEf</a></li>
- <li><b>Youtube: </b><a href='https://www.youtube.com/watch?v=pKdgz_p4oSo'>https://www.youtube.com/watch?v=pKdgz_p4oSo</a></li>
- <li><b>Forum: </b><a href='https://retrowiki.es/viewforum.php?f=114'>https://retrowiki.es/viewforum.php?f=114</a></li>
-</ul>
+CardPuter86 is an 8086 PC emulator for the M5Stack Cardputer (ESP32-S3), based on the Fake86 emulator and the ESP32TinyFake86 port.
 
-<br><br>
-<h1>Documentation (Help)</h1>
-<ul>
- <li><a href='readmeEnglish.md'>English Doc</a></li>
- <li><a href='readmeSpanish.md'>Spanish Doc</a></li>
-</ul>
+## Features
+
+- M5Stack Cardputer keyboard support
+- ST7789 LCD output with CGA text and graphics modes
+- PC speaker output through the Cardputer I2S speaker
+- Built-in BIOS, BASIC ROM, disk image and COM program support
+- PlatformIO build and flash workflow
+
+## Build
+
+Requirements:
+
+- M5Stack Cardputer
+- Python 3
+- PlatformIO Core
+
+```sh
+cd ESP32/CardPuter86
+pio run
+```
+
+The generated firmware is written to:
+
+```text
+ESP32/CardPuter86/.pio/build/cardputer86/firmware.bin
+```
+
+## Flash
+
+Connect the Cardputer over USB and run:
+
+```sh
+./flash.sh
+```
+
+The script builds the project, detects the serial device and asks for confirmation before uploading.
+
+## Keyboard
+
+- `Opt` + `1` through `0`: F1 through F10
+- `Opt` + `-`: F11
+- `Opt` + `=`: F12
+- `Aa`: Caps Lock
+- `Ctrl`, `Alt`: corresponding PC modifier keys
+- `Fn`: reserved for future CardPuter86 functions
+- G0 button: reserved
+
+Opt combinations replace their base keys, so `Opt+1` sends only F1 rather than both `1` and F1.
+
+## Documentation
+
+- [English](README.en.md)
+- [Español](README.es.md)
+
+## Credits
+
+CardPuter86 uses the Fake86 emulator by Mike Chambers and is derived from the ESP32TinyFake86 project by Ackerman. Original project material remains under its respective license and attribution.

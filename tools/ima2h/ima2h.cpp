@@ -78,7 +78,7 @@ void InitTitles()
 //**********************************************
 void ShowHelp()
 {
- printf("TinyFake86 IMA tool\n");
+ printf("CardPuter86 IMA tool\n");
  printf("Author: ackerman\n\n");
 }
 

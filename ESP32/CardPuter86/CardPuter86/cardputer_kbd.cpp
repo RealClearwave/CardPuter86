@@ -16,6 +16,7 @@ static bool osd_cache_inited = false;
 void cardputer_kbd_init(void) {
     // Keyboard already initialized by M5Cardputer.begin(true)
     memset((void *)keymap, 1, sizeof(keymap));
+    memset((void *)oldKeymap, 1, sizeof(oldKeymap));
     memset(osd_cache, 1, sizeof(osd_cache));
     osd_cache_inited = true;
 }
@@ -86,15 +87,14 @@ void cardputer_kbd_fill_keymap(void) {
     Keyboard_Class::KeysState s = M5Cardputer.Keyboard.keysState();
 
     // Modifiers
-    if (s.shift) keymap[PS2_KC_L_SHIFT] = 0;
+    // The physical Aa key is exposed as "shift" by M5Cardputer.
+    if (s.shift) keymap[PS2_KC_CAPS] = 0;
     if (s.ctrl)  keymap[PS2_KC_CTRL]    = 0;
     if (s.alt)   keymap[PS2_KC_ALT]     = 0;
 
     // Special keys
     if (s.enter) keymap[PS2_KC_ENTER]   = 0;
-    if (s.del) {
-        keymap[s.fn ? PS2_KC_DELETE : PS2_KC_BS] = 0;
-    }
+    if (s.del)   keymap[PS2_KC_BS]      = 0;
     if (s.tab)   keymap[PS2_KC_TAB]     = 0;
     if (s.space) keymap[PS2_KC_SPACE]   = 0;
 
@@ -104,36 +104,25 @@ void cardputer_kbd_fill_keymap(void) {
         if (sc) keymap[sc] = 0;
     }
 
-    // FN layer overrides — scan with isKeyPressed for non-printable combos
-    // The library tracks FN state internally in state.fn
-    // When FN is held, the keysState() already reports shifted values for F-keys etc.
-    // But the library doesn't differentiate arrow keys. We fake them below:
-    if (s.fn) {
-        if (M5Cardputer.Keyboard.isKeyPressed('/')) {
-            keymap[KEY_CURSOR_RIGHT] = 0;
+    // CardPuter86 function layer: Opt+1..0,-,= maps to F1..F12.
+    if (s.opt) {
+        static const char layer_keys[] = "1234567890-=";
+        static const uint8_t base_scancodes[] = {
+            PS2_KC_1, PS2_KC_2, PS2_KC_3, PS2_KC_4, PS2_KC_5,
+            PS2_KC_6, PS2_KC_7, PS2_KC_8, PS2_KC_9, PS2_KC_0,
+            PS2_KC_MINUS, PS2_KC_EQUAL
+        };
+        static const uint8_t function_scancodes[] = {
+            PS2_KC_F1, PS2_KC_F2, PS2_KC_F3, PS2_KC_F4, PS2_KC_F5,
+            PS2_KC_F6, PS2_KC_F7, PS2_KC_F8, PS2_KC_F9, PS2_KC_F10,
+            PS2_KC_F11, PS2_KC_F12
+        };
+        for (uint8_t i = 0; i < 12; i++) {
+            if (M5Cardputer.Keyboard.isKeyPressed(layer_keys[i])) {
+                keymap[base_scancodes[i]] = 1;
+                keymap[function_scancodes[i]] = 0;
+            }
         }
-        if (M5Cardputer.Keyboard.isKeyPressed('.')) {
-            keymap[KEY_CURSOR_DOWN] = 0;
-        }
-        if (M5Cardputer.Keyboard.isKeyPressed(',')) {
-            keymap[KEY_CURSOR_LEFT] = 0;
-        }
-        if (M5Cardputer.Keyboard.isKeyPressed(';')) {
-            keymap[KEY_CURSOR_UP] = 0;
-        }
-        // FN+1..0 → F1..F10
-        if (M5Cardputer.Keyboard.isKeyPressed('1')) keymap[PS2_KC_F1] = 0;
-        if (M5Cardputer.Keyboard.isKeyPressed('2')) keymap[PS2_KC_F2] = 0;
-        if (M5Cardputer.Keyboard.isKeyPressed('3')) keymap[PS2_KC_F3] = 0;
-        if (M5Cardputer.Keyboard.isKeyPressed('4')) keymap[PS2_KC_F4] = 0;
-        if (M5Cardputer.Keyboard.isKeyPressed('5')) keymap[PS2_KC_F5] = 0;
-        if (M5Cardputer.Keyboard.isKeyPressed('6')) keymap[PS2_KC_F6] = 0;
-        if (M5Cardputer.Keyboard.isKeyPressed('7')) keymap[PS2_KC_F7] = 0;
-        if (M5Cardputer.Keyboard.isKeyPressed('8')) keymap[PS2_KC_F8] = 0;
-        if (M5Cardputer.Keyboard.isKeyPressed('9')) keymap[PS2_KC_F9] = 0;
-        if (M5Cardputer.Keyboard.isKeyPressed('0')) keymap[PS2_KC_F10] = 0;
-        // FN + backtick → ESC
-        if (M5Cardputer.Keyboard.isKeyPressed('`')) keymap[PS2_KC_ESC] = 0;
     }
 }
 

@@ -269,7 +269,7 @@ unsigned char ShowTinyMenu(const char *cadTitle,const char **ptrValue,unsigned c
  unsigned char aReturn=0;
  unsigned char salir=0;
  SDLClear();
- SDLprintText("Port Fake86 by Ackerman",gb_pos_x_menu-(4<<3),gb_pos_y_menu-16,WHITE,0);
+ SDLprintText("CardPuter86",gb_pos_x_menu-(4<<3),gb_pos_y_menu-16,WHITE,0);
  for (int i=0;i<20;i++)
   SDLprintCharOSD(' ',gb_pos_x_menu+(i<<3),gb_pos_y_menu,0,WHITE);
  SDLprintText(cadTitle,gb_pos_x_menu,gb_pos_y_menu,0,WHITE);
@@ -670,14 +670,7 @@ void do_tinyOSD()
  int auxVol;
  int auxFrec;  
  unsigned char aSelNum;
- if (checkAndCleanKey(KEY_F12))
- {
-  gb_show_osd_main_menu= 1;
-  #ifdef use_lib_sound_ay8912  
-   gb_silence_all_channels = 1;
-  #endif    
-  return;
- }
+ // F12 is passed to the emulated PC. Fn and G0 remain reserved.
 
  if (gb_show_osd_main_menu == 1)
  {

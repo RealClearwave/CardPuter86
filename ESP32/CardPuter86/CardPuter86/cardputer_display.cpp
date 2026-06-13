@@ -109,9 +109,9 @@ void cardputer_display_init(void) {
     M5Cardputer.Display.setTextColor(TFT_WHITE, TFT_BLUE);
     M5Cardputer.Display.setTextSize(1.0);
     M5Cardputer.Display.setCursor(2, 1);
-    M5Cardputer.Display.print("Fake86 Cardputer");
+    M5Cardputer.Display.print("CardPuter86");
 
-    tft_log("Fake86 PC Emulator");
+    tft_log("CardPuter86 PC Emulator");
     tft_log_num("LCD:", dw);
     tft_log_num("x", dh);
 

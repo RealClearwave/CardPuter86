@@ -84,8 +84,8 @@
  extern volatile unsigned char keymap[256];
  extern volatile unsigned char oldKeymap[256];
 
- extern unsigned char gb_key_cur[45];
- extern unsigned char gb_key_before[45];
+ extern unsigned char gb_key_cur[80];
+ extern unsigned char gb_key_before[80];
 
  // Cardputer: TFT RGB565 palette (16 entries)
  extern unsigned short int gb_palette_rgb565[16];

@@ -1,4 +1,4 @@
-//Port Fake86 to M5Stack Cardputer
+// CardPuter86 - 8086 PC emulator for M5Stack Cardputer
 //Original: ESP32TinyFake86 by ackerman (TTGO VGA32)
 //Cardputer port: 8086 PC emulator on ESP32-S3 with ST7789 TFT
 
@@ -68,8 +68,8 @@ unsigned int gb_max_vga_ticks, gb_min_vga_ticks, gb_cur_vga_ticks;
 unsigned long tickgap = 0;
 unsigned char port3da = 0;
 
-unsigned char gb_key_cur[45];
-unsigned char gb_key_before[45];
+unsigned char gb_key_cur[80];
+unsigned char gb_key_before[80];
 
 // CGA palette (raw 6-bit VGA color values)
 const unsigned char palettecga[16] = {
@@ -197,8 +197,8 @@ void ProcesarAcciones() {
         gb_reset = 0;
         ClearRAM();
         memset(gb_video_cga, 0, 16384);
-        memset(gb_key_cur, 1, 45);
-        memset(gb_key_before, 1, 45);
+        memset(gb_key_cur, 1, sizeof(gb_key_cur));
+        memset(gb_key_before, 1, sizeof(gb_key_before));
         running = 1;
         reset86();
         inithardware();
@@ -295,13 +295,41 @@ unsigned char TraduceTecla(unsigned char aux) {
         case PS2_KC_ENTER: aRet = 28; break;
         case PS2_KC_SPACE: aRet = 57; break;
         case PS2_KC_BS: aRet = 14; break;
+        case PS2_KC_TAB: aRet = 15; break;
         case PS2_KC_ESC: aRet = 1; break;
-        case PS2_KC_F8: aRet = 66; break;
+        case PS2_KC_L_SHIFT: aRet = 42; break;
+        case PS2_KC_R_SHIFT: aRet = 54; break;
+        case PS2_KC_CTRL: aRet = 29; break;
+        case PS2_KC_ALT: aRet = 56; break;
+        case PS2_KC_CAPS: aRet = 58; break;
+        case PS2_KC_MINUS: aRet = 12; break;
+        case PS2_KC_EQUAL: aRet = 13; break;
+        case PS2_KC_OPEN_SQ: aRet = 26; break;
+        case PS2_KC_CLOSE_SQ: aRet = 27; break;
+        case PS2_KC_SEMI: aRet = 39; break;
+        case PS2_KC_APOS: aRet = 40; break;
+        case PS2_KC_SINGLE: aRet = 41; break;
+        case PS2_KC_BACK: aRet = 43; break;
+        case PS2_KC_COMMA: aRet = 51; break;
+        case PS2_KC_DOT: aRet = 52; break;
+        case PS2_KC_DIV: aRet = 53; break;
+        case PS2_KC_DELETE: aRet = 83; break;
         case KEY_CURSOR_LEFT: aRet = 75; break;
         case KEY_CURSOR_RIGHT: aRet = 77; break;
         case KEY_CURSOR_UP: aRet = 72; break;
         case KEY_CURSOR_DOWN: aRet = 80; break;
         case PS2_KC_F1: aRet = 59; break;
+        case PS2_KC_F2: aRet = 60; break;
+        case PS2_KC_F3: aRet = 61; break;
+        case PS2_KC_F4: aRet = 62; break;
+        case PS2_KC_F5: aRet = 63; break;
+        case PS2_KC_F6: aRet = 64; break;
+        case PS2_KC_F7: aRet = 65; break;
+        case PS2_KC_F8: aRet = 66; break;
+        case PS2_KC_F9: aRet = 67; break;
+        case PS2_KC_F10: aRet = 68; break;
+        case PS2_KC_F11: aRet = 87; break;
+        case PS2_KC_F12: aRet = 88; break;
         default: aRet = 0; break;
     }
     return aRet;
@@ -384,78 +412,39 @@ unsigned char TraduceCodigoTecla(int aux) {
 // Handle keyboard input (Cardputer → emulated PC)
 // ===============================================
 void handleinput() {
-    // F8 hotkey: load Digger
-    if (keymap[PS2_KC_F8] == 0) {
-        LoadCOMFlash(gb_com_digger, 57856, 0x0051);
-        return;
+    static const uint8_t monitored_keys[] = {
+        PS2_KC_A, PS2_KC_B, PS2_KC_C, PS2_KC_D, PS2_KC_E, PS2_KC_F,
+        PS2_KC_G, PS2_KC_H, PS2_KC_I, PS2_KC_J, PS2_KC_K, PS2_KC_L,
+        PS2_KC_M, PS2_KC_N, PS2_KC_O, PS2_KC_P, PS2_KC_Q, PS2_KC_R,
+        PS2_KC_S, PS2_KC_T, PS2_KC_U, PS2_KC_V, PS2_KC_W, PS2_KC_X,
+        PS2_KC_Y, PS2_KC_Z,
+        PS2_KC_0, PS2_KC_1, PS2_KC_2, PS2_KC_3, PS2_KC_4,
+        PS2_KC_5, PS2_KC_6, PS2_KC_7, PS2_KC_8, PS2_KC_9,
+        PS2_KC_ENTER, PS2_KC_SPACE, PS2_KC_BS, PS2_KC_TAB, PS2_KC_ESC,
+        PS2_KC_L_SHIFT, PS2_KC_CTRL, PS2_KC_ALT, PS2_KC_CAPS,
+        PS2_KC_MINUS, PS2_KC_EQUAL, PS2_KC_OPEN_SQ, PS2_KC_CLOSE_SQ,
+        PS2_KC_SEMI, PS2_KC_APOS, PS2_KC_SINGLE, PS2_KC_BACK,
+        PS2_KC_COMMA, PS2_KC_DOT, PS2_KC_DIV, PS2_KC_DELETE,
+        KEY_CURSOR_LEFT, KEY_CURSOR_RIGHT, KEY_CURSOR_UP, KEY_CURSOR_DOWN,
+        PS2_KC_F1, PS2_KC_F2, PS2_KC_F3, PS2_KC_F4, PS2_KC_F5,
+        PS2_KC_F6, PS2_KC_F7, PS2_KC_F8, PS2_KC_F9, PS2_KC_F10,
+        PS2_KC_F11, PS2_KC_F12
+    };
+    const size_t key_count = sizeof(monitored_keys) / sizeof(monitored_keys[0]);
+
+    for (size_t i = 0; i < key_count; i++) {
+        gb_key_cur[i] = keymap[monitored_keys[i]];
     }
 
-    // Build current key state from Cardputer keyboard map
-    gb_key_cur[0] = keymap[PS2_KC_A];
-    gb_key_cur[1] = keymap[PS2_KC_B];
-    gb_key_cur[2] = keymap[PS2_KC_C];
-    gb_key_cur[3] = keymap[PS2_KC_D];
-    gb_key_cur[4] = keymap[PS2_KC_E];
-    gb_key_cur[5] = keymap[PS2_KC_F];
-    gb_key_cur[6] = keymap[PS2_KC_G];
-    gb_key_cur[7] = keymap[PS2_KC_H];
-    gb_key_cur[8] = keymap[PS2_KC_I];
-    gb_key_cur[9] = keymap[PS2_KC_J];
-    gb_key_cur[10] = keymap[PS2_KC_K];
-    gb_key_cur[11] = keymap[PS2_KC_L];
-    gb_key_cur[12] = keymap[PS2_KC_M];
-    gb_key_cur[13] = keymap[PS2_KC_N];
-    gb_key_cur[14] = keymap[PS2_KC_O];
-    gb_key_cur[15] = keymap[PS2_KC_P];
-    gb_key_cur[16] = keymap[PS2_KC_Q];
-    gb_key_cur[17] = keymap[PS2_KC_R];
-    gb_key_cur[18] = keymap[PS2_KC_S];
-    gb_key_cur[19] = keymap[PS2_KC_T];
-    gb_key_cur[20] = keymap[PS2_KC_U];
-    gb_key_cur[21] = keymap[PS2_KC_V];
-    gb_key_cur[22] = keymap[PS2_KC_W];
-    gb_key_cur[23] = keymap[PS2_KC_X];
-    gb_key_cur[24] = keymap[PS2_KC_Y];
-    gb_key_cur[25] = keymap[PS2_KC_Z];
-    gb_key_cur[26] = keymap[PS2_KC_0];
-    gb_key_cur[27] = keymap[PS2_KC_1];
-    gb_key_cur[28] = keymap[PS2_KC_2];
-    gb_key_cur[29] = keymap[PS2_KC_3];
-    gb_key_cur[30] = keymap[PS2_KC_4];
-    gb_key_cur[31] = keymap[PS2_KC_5];
-    gb_key_cur[32] = keymap[PS2_KC_6];
-    gb_key_cur[33] = keymap[PS2_KC_7];
-    gb_key_cur[34] = keymap[PS2_KC_8];
-    gb_key_cur[35] = keymap[PS2_KC_9];
-    gb_key_cur[36] = keymap[PS2_KC_ENTER];
-    gb_key_cur[37] = keymap[PS2_KC_SPACE];
-    gb_key_cur[38] = keymap[PS2_KC_BS];
-    gb_key_cur[39] = keymap[PS2_KC_ESC];
-    gb_key_cur[40] = keymap[KEY_CURSOR_LEFT];
-    gb_key_cur[41] = keymap[KEY_CURSOR_RIGHT];
-    gb_key_cur[42] = keymap[KEY_CURSOR_UP];
-    gb_key_cur[43] = keymap[KEY_CURSOR_DOWN];
-    gb_key_cur[44] = keymap[PS2_KC_F1];
-
-    unsigned char igual = 1;
-    unsigned char mi_tecla = 0;
-    for (unsigned char i = 0; i < 45; i++) {
+    // Keep the proven state-array input path. Acknowledge only the event sent
+    // this poll so simultaneous key changes are delivered on later polls.
+    for (size_t i = 0; i < key_count; i++) {
         if (gb_key_cur[i] != gb_key_before[i]) {
-            igual = 0;
-            mi_tecla = i;
-            break;
-        }
-    }
-
-    memcpy(gb_key_before, gb_key_cur, 45);
-
-    if (igual == 0) {
-        unsigned char codigo_key = TraduceCodigoTecla(mi_tecla);
-        if (codigo_key != 0) {
-            if (gb_key_cur[mi_tecla] == 0) {
-                CheckTeclaSDL(codigo_key, 0); // Key pressed
-            } else {
-                CheckTeclaSDL(codigo_key, 1); // Key released
+            unsigned char xt_code = TraduceTecla(monitored_keys[i]);
+            gb_key_before[i] = gb_key_cur[i];
+            if (xt_code) {
+                CheckTeclaSDL(xt_code, gb_key_cur[i]);
+                return;
             }
         }
     }
@@ -492,7 +481,7 @@ void setup() {
 #ifdef use_lib_log_serial
     Serial.begin(115200);
     delay(500);
-    Serial.printf("\n=== Cardputer Fake86 ===\n");
+    Serial.printf("\n=== CardPuter86 ===\n");
     Serial.printf("Free heap: %lu\n", (unsigned long)ESP.getFreeHeap());
     Serial.printf("PSRAM: %lu\n", (unsigned long)ESP.getPsramSize());
 #endif
@@ -522,8 +511,8 @@ void setup() {
     ClearRAM();
     SetRAMTruco();
     bootstrapPoll();
-    memset(gb_key_cur, 1, 45);
-    memset(gb_key_before, 1, 45);
+    memset(gb_key_cur, 1, sizeof(gb_key_cur));
+    memset(gb_key_before, 1, sizeof(gb_key_before));
     FuerzoParityRAM();
 
     // Initialize emulator
