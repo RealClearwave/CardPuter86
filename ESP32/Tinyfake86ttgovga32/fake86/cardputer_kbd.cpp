@@ -92,7 +92,9 @@ void cardputer_kbd_fill_keymap(void) {
 
     // Special keys
     if (s.enter) keymap[PS2_KC_ENTER]   = 0;
-    if (s.del)   keymap[PS2_KC_BS]      = 0;
+    if (s.del) {
+        keymap[s.fn ? PS2_KC_DELETE : PS2_KC_BS] = 0;
+    }
     if (s.tab)   keymap[PS2_KC_TAB]     = 0;
     if (s.space) keymap[PS2_KC_SPACE]   = 0;
 
@@ -132,8 +134,6 @@ void cardputer_kbd_fill_keymap(void) {
         if (M5Cardputer.Keyboard.isKeyPressed('0')) keymap[PS2_KC_F10] = 0;
         // FN + backtick → ESC
         if (M5Cardputer.Keyboard.isKeyPressed('`')) keymap[PS2_KC_ESC] = 0;
-        // FN + backspace → DEL
-        keymap[PS2_KC_DELETE] = 0; // actually this needs proper detection
     }
 }
 

@@ -310,8 +310,7 @@ unsigned char TraduceTecla(unsigned char aux) {
 // ===============================================
 // Send key event to emulated PC
 // ===============================================
-void CheckTeclaSDL(int aux, unsigned char pulsado) {
-    unsigned char codigo = TraduceTecla(aux);
+void CheckTeclaSDL(unsigned char codigo, unsigned char pulsado) {
     if (codigo == 0) return;
 
     if (pulsado == 0) {
@@ -454,9 +453,9 @@ void handleinput() {
         unsigned char codigo_key = TraduceCodigoTecla(mi_tecla);
         if (codigo_key != 0) {
             if (gb_key_cur[mi_tecla] == 0) {
-                CheckTeclaSDL(mi_tecla, 0); // Key pressed
+                CheckTeclaSDL(codigo_key, 0); // Key pressed
             } else {
-                CheckTeclaSDL(mi_tecla, 1); // Key released
+                CheckTeclaSDL(codigo_key, 1); // Key released
             }
         }
     }
