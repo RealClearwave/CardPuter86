@@ -228,15 +228,19 @@ void ClearRAM() {
 // ===============================================
 // Allocate RAM banks for emulator
 // ===============================================
-void CreateRAM() {
+bool CreateRAM() {
     gb_ram_00 = (unsigned char *)malloc(32768);
     gb_ram_01 = (unsigned char *)malloc(32768);
     gb_ram_02 = (unsigned char *)malloc(32768);
     gb_ram_03 = (unsigned char *)malloc(32768);
-    if (gb_max_ram >= 163840) {
-        gb_ram_04 = (unsigned char *)malloc(32768);
-        memset(gb_ram_04, 0, 32768);
-        gb_ram_bank[4] = gb_ram_04;
+
+    if (!gb_ram_00 || !gb_ram_01 || !gb_ram_02 || !gb_ram_03) {
+        free(gb_ram_00);
+        free(gb_ram_01);
+        free(gb_ram_02);
+        free(gb_ram_03);
+        gb_ram_00 = gb_ram_01 = gb_ram_02 = gb_ram_03 = NULL;
+        return false;
     }
 
     memset(gb_ram_00, 0, 32768);
@@ -248,6 +252,8 @@ void CreateRAM() {
     gb_ram_bank[1] = gb_ram_01;
     gb_ram_bank[2] = gb_ram_02;
     gb_ram_bank[3] = gb_ram_03;
+    gb_ram_bank[4] = NULL;
+    return true;
 }
 
 // ===============================================
@@ -510,7 +516,14 @@ void setup() {
 #endif
 
     // Allocate emulator RAM
-    CreateRAM();
+    if (!CreateRAM()) {
+        tft_log("ERROR: emulator RAM allocation failed");
+#ifdef use_lib_log_serial
+        Serial.printf("RAM allocation failed. Free heap: %lu\n",
+                      (unsigned long)ESP.getFreeHeap());
+#endif
+        while (true) delay(1000);
+    }
     ClearRAM();
     SetRAMTruco();
     bootstrapPoll();

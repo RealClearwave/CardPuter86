@@ -91,9 +91,9 @@
  #define gb_max_portram 0x3FF
  #define use_lib_limit_portram
 
- //128 KB for emulator RAM (fits in ESP32-S3 SRAM)
- //160 KB Para MADMIX
- #define gb_max_ram 163840
+ // 128 KB leaves enough SRAM for the 320x200 framebuffer, TFT sprite,
+ // SD support and TinyUSB bookkeeping on the non-PSRAM Cardputer.
+ #define gb_max_ram 131072
 
  //#define use_lib_not_use_callback_port
  #define use_lib_fast_boot
