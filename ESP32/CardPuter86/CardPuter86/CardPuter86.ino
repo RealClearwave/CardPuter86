@@ -488,6 +488,10 @@ void setup() {
     // Initialize TFT display (draws boot log on screen)
     cardputer_display_init();
 
+#ifdef use_lib_sdcard
+    cardputer_sd_enter_usb_mode_if_requested();
+#endif
+
     // Continue logging on screen
     tft_log_num("Heap free:", (unsigned long)ESP.getFreeHeap());
     tft_log_num("PSRAM:", (unsigned long)ESP.getPsramSize());
@@ -513,6 +517,14 @@ void setup() {
     memset(gb_key_cur, 1, sizeof(gb_key_cur));
     memset(gb_key_before, 1, sizeof(gb_key_before));
     FuerzoParityRAM();
+
+#ifdef use_lib_sdcard
+    // BIOS data area: number of installed hard disks.
+    if (gb_sd_disk.mounted && gb_sd_disk.drive == 0x80) {
+        gb_ram_bank[0][0x475] = 1;
+        hdcount = 1;
+    }
+#endif
 
     // Initialize emulator
     running = 1;

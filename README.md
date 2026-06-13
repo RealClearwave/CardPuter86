@@ -51,6 +51,12 @@ The script builds the project, detects the serial device and asks for confirmati
 
 Fn combinations replace their base keys, so `Fn+1` sends only F1 rather than both `1` and F1.
 
+## SD Card
+
+Place a raw DOS disk image in the SD card root. `cardputer86.img` or `cardputer86.dsk` is preferred; otherwise the first `.img`/`.dsk` file is used. Floppy-sized images are mounted as `B:`, while images larger than 2.88 MB are mounted as hard drive `C:`. The image is writable.
+
+To access the whole SD card from a connected computer, hold `Opt` continuously for at least three seconds while powering on or resetting the Cardputer. CardPuter86 then starts in USB mass-storage mode instead of launching the emulator. Eject the disk on the computer before rebooting the Cardputer.
+
 ## Documentation
 
 - [English](README.en.md)

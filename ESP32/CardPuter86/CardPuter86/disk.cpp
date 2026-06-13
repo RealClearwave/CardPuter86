@@ -40,6 +40,33 @@ extern void write86 (uint32_t addr32, uint8_t value);
 //JJ struct struct_drive disk[1]; //Dejo 1 para probar
 unsigned char sectorbuffer[512];
 
+static bool is_sd_drive(uint8_t drivenum) {
+#ifdef use_lib_sdcard
+ return gb_sd_disk.mounted && gb_sd_disk.drive == drivenum;
+#else
+ return false;
+#endif
+}
+
+static bool drive_geometry(uint8_t drivenum, uint16_t *cylinders,
+                           uint8_t *heads, uint8_t *sectors) {
+#ifdef use_lib_sdcard
+ if (is_sd_drive(drivenum)) {
+  *cylinders = gb_sd_disk.cylinders;
+  *heads = gb_sd_disk.heads;
+  *sectors = gb_sd_disk.sectors;
+  return true;
+ }
+#endif
+ if (drivenum == 0) {
+  *cylinders = gb_list_dsk_cyls[gb_id_cur_dsk];
+  *heads = gb_list_dsk_heads[gb_id_cur_dsk];
+  *sectors = gb_list_dsk_sects[gb_id_cur_dsk];
+  return true;
+ }
+ return false;
+}
+
 //JJuint8_t insertdisk (uint8_t drivenum, char *filename)
 //JJ{
 //JJ if (drivenum >1)
@@ -70,13 +97,23 @@ unsigned char sectorbuffer[512];
 
 void readdisk (uint8_t drivenum, uint16_t dstseg, uint16_t dstoff, uint16_t cyl, uint16_t sect, uint16_t head, uint16_t sectcount) {
  uint32_t memdest, lba, fileoffset, cursect, sectoffset;
- //JJ if (!sect || !disk[drivenum].inserted) return;
- if (!sect) return;
- //JJ lba = ( (uint32_t) cyl * (uint32_t) disk[drivenum].heads + (uint32_t) head) * (uint32_t) disk[drivenum].sects + (uint32_t) sect - 1;
- lba = ( (uint32_t) cyl * (uint32_t) gb_list_dsk_heads[gb_id_cur_dsk] + (uint32_t) head) * (uint32_t) gb_list_dsk_sects[gb_id_cur_dsk] + (uint32_t) sect - 1;
+ uint16_t cylinders;
+ uint8_t heads, sectors;
+ if (!sect || !drive_geometry(drivenum, &cylinders, &heads, &sectors)) {
+  ExternalSetCF(1); regs.byteregs[regah] = 1; return;
+ }
+ lba = ((uint32_t)cyl * heads + head) * sectors + sect - 1;
  fileoffset = lba * 512;
-//JJ if (fileoffset>=(disk[drivenum].filesize-1)) return;
- if (fileoffset>=((unsigned int)gb_list_dsk_filesize[gb_id_cur_dsk]-1)) return;
+ uint32_t disk_size = is_sd_drive(drivenum)
+#ifdef use_lib_sdcard
+  ? gb_sd_disk.size
+#else
+  ? 0
+#endif
+  : gb_list_dsk_filesize[gb_id_cur_dsk];
+ if (fileoffset + 512 > disk_size) {
+  ExternalSetCF(1); regs.byteregs[regah] = 4; return;
+ }
  //fseek (disk[drivenum].diskfile, fileoffset, SEEK_SET);	
  memdest = ( (uint32_t) dstseg << 4) + (uint32_t) dstoff;
  //for the readdisk function, we need to use write86 instead of directly fread'ing into
@@ -84,6 +121,7 @@ void readdisk (uint8_t drivenum, uint16_t dstseg, uint16_t dstoff, uint16_t cyl,
  //data from a disk over BIOS or other ROM code that it shouldn't be able to.
  for (cursect=0; cursect<sectcount; cursect++)
  {
+  if (fileoffset + 512 > disk_size) break;
   //if (fread (sectorbuffer, 1, 512, disk[drivenum].diskfile) < 512) break;
   //memcpy(sectorbuffer,&gb_dsk_compaq211cat[fileoffset],512);
   //memcpy(sectorbuffer,&gb_dsk_msdos300gameover[fileoffset],512);  
@@ -91,26 +129,44 @@ void readdisk (uint8_t drivenum, uint16_t dstseg, uint16_t dstoff, uint16_t cyl,
   //memcpy(sectorbuffer,&gb_dsk_compaq211madmix[fileoffset],512);
   //memcpy(sectorbuffer,&gb_dsk_solnegro[fileoffset],512);  
   //memcpy(sectorbuffer,&gb_dsk_pakupaku[fileoffset],512);
-  memcpy(sectorbuffer,&gb_list_dsk_data[gb_id_cur_dsk][fileoffset],512);
-  fileoffset+= 512;
-  if (fileoffset >= (368640-1))
-  {
-   //printf("ReadDsk over %d\n",fileoffset);
-   //fflush(stdout);                 
-   break;
+  if (is_sd_drive(drivenum)) {
+#ifdef use_lib_sdcard
+   if (!cardputer_sd_read_sector(gb_sd_disk.filename, fileoffset / 512, sectorbuffer)) break;
+#endif
+  } else {
+   memcpy(sectorbuffer,&gb_list_dsk_data[gb_id_cur_dsk][fileoffset],512);
   }
+  fileoffset+= 512;
   for (sectoffset=0; sectoffset<512; sectoffset++) {
    write86 (memdest++, sectorbuffer[sectoffset]);
   }
  }
  regs.byteregs[regal] = cursect;
  //cf = 0;
- ExternalSetCF(0);
- regs.byteregs[regah] = 0;
+ ExternalSetCF(cursect == sectcount ? 0 : 1);
+ regs.byteregs[regah] = cursect == sectcount ? 0 : 4;
 }
 
 void writedisk (uint8_t drivenum, uint16_t dstseg, uint16_t dstoff, uint16_t cyl, uint16_t sect, uint16_t head, uint16_t sectcount) {
- return;
+ uint16_t cylinders;
+ uint8_t heads, sectors;
+ if (!is_sd_drive(drivenum) || !sect ||
+     !drive_geometry(drivenum, &cylinders, &heads, &sectors)) {
+  ExternalSetCF(1); regs.byteregs[regah] = 3; return;
+ }
+
+#ifdef use_lib_sdcard
+ uint32_t lba = ((uint32_t)cyl * heads + head) * sectors + sect - 1;
+ uint32_t memsrc = ((uint32_t)dstseg << 4) + dstoff;
+ uint16_t written = 0;
+ for (; written < sectcount && (lba + written) * 512UL < gb_sd_disk.size; written++) {
+  for (uint16_t i = 0; i < 512; i++) sectorbuffer[i] = read86(memsrc++);
+  if (!cardputer_sd_write_sector(gb_sd_disk.filename, lba + written, sectorbuffer)) break;
+ }
+ regs.byteregs[regal] = written;
+ ExternalSetCF(written == sectcount ? 0 : 1);
+ regs.byteregs[regah] = written == sectcount ? 0 : 3;
+#endif
 }
 
 /*uint8_t insertdisk (uint8_t drivenum, char *filename) {
@@ -212,7 +268,7 @@ void diskhandler()
 				regs.byteregs[regah] = lastdiskah[regs.byteregs[regdl]];
 				cf = lastdiskcf[regs.byteregs[regdl]];
 				return;
-			case 2: //read sector(s) into memory
+				case 2: //read sector(s) into memory
 				if (disk[regs.byteregs[regdl]].inserted) {
 						readdisk (regs.byteregs[regdl], segregs[reges], getreg16 (regbx), regs.byteregs[regch] + (regs.byteregs[regcl]/64) *256, regs.byteregs[regcl] & 63, regs.byteregs[regdh], regs.byteregs[regal]);
 						cf = 0;
@@ -284,8 +340,6 @@ void diskhandler()
 				//JJ if (disk[regs.byteregs[regdl]].inserted) {
 						readdisk (regs.byteregs[regdl], segregs[reges], getreg16 (regbx), regs.byteregs[regch] + (regs.byteregs[regcl]/64) *256, regs.byteregs[regcl] & 63, regs.byteregs[regdh], regs.byteregs[regal]);
 						//cf = 0;
-						ExternalSetCF(0);
-						regs.byteregs[regah] = 0;
 				//JJ 	}
 				//JJ else {
 				//JJ 		//cf = 1;
@@ -293,12 +347,10 @@ void diskhandler()
 				//JJ 		regs.byteregs[regah] = 1;
 				//JJ 	}
 				break;
-			case 3: //write sector(s) from memory
+				case 3: //write sector(s) from memory
 				//JJ if (disk[regs.byteregs[regdl]].inserted) {
 						writedisk (regs.byteregs[regdl], segregs[reges], getreg16 (regbx), regs.byteregs[regch] + (regs.byteregs[regcl]/64) *256, regs.byteregs[regcl] & 63, regs.byteregs[regdh], regs.byteregs[regal]);
 						//cf = 0;
-						ExternalSetCF(0);
-						regs.byteregs[regah] = 0;
 				//JJ 	}
 				//JJ else {
 				//JJ 		//cf = 1;
@@ -312,25 +364,32 @@ void diskhandler()
 				ExternalSetCF(0);
 				regs.byteregs[regah] = 0;
 				break;
-			case 8: //get drive parameters
-				//JJ if (disk[regs.byteregs[regdl]].inserted) {
-						cf = 0;
+				case 8: //get drive parameters
+					{
+						uint16_t cylinders;
+						uint8_t heads, sectors;
+						if (!drive_geometry(regs.byteregs[regdl], &cylinders, &heads, &sectors)) {
+							ExternalSetCF(1); regs.byteregs[regah] = 0xAA; break;
+						}
+							cf = 0;
 						ExternalSetCF(0);
 						regs.byteregs[regah] = 0;
 						//JJ regs.byteregs[regch] = disk[regs.byteregs[regdl]].cyls - 1;
-						regs.byteregs[regch] = gb_list_dsk_cyls[gb_id_cur_dsk] - 1;
+							uint16_t max_cylinder = cylinders - 1;
+							regs.byteregs[regch] = max_cylinder & 0xFF;
 						//JJ regs.byteregs[regcl] = disk[regs.byteregs[regdl]].sects & 63;
-						regs.byteregs[regcl] = gb_list_dsk_sects[gb_id_cur_dsk] & 63;
+							regs.byteregs[regcl] = sectors & 63;
 						//JJ regs.byteregs[regcl] = regs.byteregs[regcl] + (disk[regs.byteregs[regdl]].cyls/256) *64;
-						regs.byteregs[regcl] = regs.byteregs[regcl] + (gb_list_dsk_cyls[gb_id_cur_dsk]/256) *64;
+							regs.byteregs[regcl] |= ((max_cylinder >> 8) & 0x03) << 6;
 						//JJ regs.byteregs[regdh] = disk[regs.byteregs[regdl]].heads - 1;
-						regs.byteregs[regdh] = gb_list_dsk_heads[gb_id_cur_dsk] - 1;
+							regs.byteregs[regdh] = heads - 1;
 						//segregs[reges] = 0; regs.wordregs[regdi] = 0x7C0B; //floppy parameter table
 						if (regs.byteregs[regdl]<0x80) {
 								regs.byteregs[regbl] = 4; //else regs.byteregs[regbl] = 0;
 								regs.byteregs[regdl] = 2;
 							}
-						else regs.byteregs[regdl] = hdcount;
+							else regs.byteregs[regdl] = gb_sd_disk.mounted && gb_sd_disk.drive == 0x80 ? 1 : 0;
+					}
 				//JJ 	}
 				//JJ else {
 				//JJ 		//cf = 1;

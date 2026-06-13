@@ -23,6 +23,10 @@ El script `flash.sh` del directorio principal también compila, detecta el puert
 
 Las teclas normales del Cardputer corresponden a las teclas del PC. La tecla Aa corresponde a Shift, mientras que Ctrl y Alt funcionan como modificadores. Fn es la capa de funciones de CardPuter86: Fn+1 hasta Fn+0 envían F1-F10, Fn+- envía F11 y Fn+= envía F12. Opt cambia entre texto 1:1 y gráficos escalados a pantalla completa. El texto largo se ajusta sin reducirse y la vista sigue la parte inferior del contenido. G0 queda reservado.
 
+## Tarjeta SD
+
+Coloque una imagen de disco DOS sin procesar en la raiz de la tarjeta SD. Se prefieren `cardputer86.img` o `cardputer86.dsk`; de lo contrario se usa el primer archivo `.img`/`.dsk`. Las imagenes de disquete se montan como `B:` y las mayores de 2,88 MB como `C:`. Mantenga pulsado `Opt` durante tres segundos al arrancar para mostrar toda la tarjeta SD al ordenador como almacenamiento USB. Expulse la unidad en el ordenador antes de reiniciar.
+
 ## Software integrado
 
 Los datos ROM, discos y programas COM se encuentran en `ESP32/CardPuter86/CardPuter86/dataFlash`. La herramienta `tools/ima2h`, procedente de ESP32TinyFake86, convierte imágenes y binarios compatibles en cabeceras C.

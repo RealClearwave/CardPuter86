@@ -20,6 +20,11 @@
 #include <stdint.h>
 #include <stdio.h>
 
+void readdisk(uint8_t drivenum, uint16_t dstseg, uint16_t dstoff,
+              uint16_t cyl, uint16_t sect, uint16_t head, uint16_t sectcount);
+void writedisk(uint8_t drivenum, uint16_t dstseg, uint16_t dstoff,
+               uint16_t cyl, uint16_t sect, uint16_t head, uint16_t sectcount);
+
 /*struct struct_drive {
 	FILE *diskfile;
 	uint32_t filesize;
