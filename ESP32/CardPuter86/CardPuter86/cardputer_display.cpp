@@ -13,7 +13,7 @@ unsigned short int gb_palette_text_rgb565[16];
 // Flat 320x200 framebuffer (one byte per pixel = CGA color index 0-15)
 unsigned char *gb_frame_buffer = NULL;
 
-// TFT sprite for double-buffered output (240x135)
+// TFT sprite for double-buffered output (240x135, two 4-bit pixels per byte)
 LGFX_Sprite *gb_tft_sprite = NULL;
 
 enum CardputerDisplayMode {
@@ -139,7 +139,7 @@ void cardputer_display_init(void) {
     gb_tft_sprite = new LGFX_Sprite(&M5Cardputer.Display);
     if (gb_tft_sprite) {
         gb_tft_sprite->setPsram(false);
-        gb_tft_sprite->setColorDepth(16);
+        gb_tft_sprite->setColorDepth(4);
         void *buf = gb_tft_sprite->createSprite(dw, dh);
         tft_log_num("Sprite buf:", (unsigned long)buf);
     }
@@ -201,24 +201,34 @@ void tft_blit_scaled(bool emulated_graphics_mode) {
     if (!gb_frame_buffer) return;
     if (!gb_tft_sprite) return;
 
-    unsigned short int *sprite_buf = (unsigned short int *)gb_tft_sprite->getBuffer();
+    unsigned char *sprite_buf = (unsigned char *)gb_tft_sprite->getBuffer();
     if (!sprite_buf) return;
 
     int dw = gb_tft_sprite->width();
     int dh = gb_tft_sprite->height();
+    const int sprite_stride = (dw + 1) / 2;
 
     const unsigned short int *palette = emulated_graphics_mode
         ? gb_palette_rgb565
         : gb_palette_text_rgb565;
+    for (int i = 0; i < 16; i++) {
+        gb_tft_sprite->setPaletteColor(i, lgfx::rgb565_t(palette[i]));
+    }
 
     if (display_mode == DISPLAY_MODE_GRAPHICS) {
         for (int y = 0; y < dh; y++) {
-            unsigned short int *dst = sprite_buf + y * dw;
+            unsigned char *dst = sprite_buf + y * sprite_stride;
             const int src_y = y * (FAKE86_FB_H - 1) / (dh - 1);
             const unsigned char *src = gb_frame_buffer + src_y * FAKE86_FB_W;
-            for (int x = 0; x < dw; x++) {
-                const int src_x = x * (FAKE86_FB_W - 1) / (dw - 1);
-                dst[x] = palette[src[src_x] & 0x0F];
+            for (int x = 0; x < dw; x += 2) {
+                const int src_x0 = x * (FAKE86_FB_W - 1) / (dw - 1);
+                const unsigned char color0 = src[src_x0] & 0x0F;
+                unsigned char color1 = 0;
+                if (x + 1 < dw) {
+                    const int src_x1 = (x + 1) * (FAKE86_FB_W - 1) / (dw - 1);
+                    color1 = src[src_x1] & 0x0F;
+                }
+                dst[x / 2] = (color0 << 4) | color1;
             }
         }
     } else {
@@ -265,10 +275,10 @@ void tft_blit_scaled(bool emulated_graphics_mode) {
         const int first_virtual_y = wrapped_height > dh ? wrapped_height - dh : 0;
 
         for (int y = 0; y < dh; y++) {
-            unsigned short int *dst = sprite_buf + y * dw;
+            unsigned char *dst = sprite_buf + y * sprite_stride;
+            memset(dst, 0, sprite_stride);
             const int virtual_y = first_virtual_y + y;
             if (virtual_y >= wrapped_height) {
-                memset(dst, 0, dw * sizeof(*dst));
                 continue;
             }
 
@@ -279,11 +289,12 @@ void tft_blit_scaled(bool emulated_graphics_mode) {
             const int copy_width = FAKE86_FB_W - row.source_x < dw
                 ? FAKE86_FB_W - row.source_x
                 : dw;
-            for (int x = 0; x < copy_width; x++) {
-                dst[x] = palette[src[x] & 0x0F];
-            }
-            for (int x = copy_width; x < dw; x++) {
-                dst[x] = palette[0];
+            for (int x = 0; x < copy_width; x += 2) {
+                const unsigned char color0 = src[x] & 0x0F;
+                const unsigned char color1 = x + 1 < copy_width
+                    ? src[x + 1] & 0x0F
+                    : 0;
+                dst[x / 2] = (color0 << 4) | color1;
             }
         }
     }

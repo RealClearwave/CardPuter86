@@ -6,10 +6,8 @@
 
 #ifdef use_lib_sdcard
 
-#define MAX_SD_DISK_FILES 32
 #define MAX_SD_FILENAME_LEN 64
 
-extern char gb_sd_disk_files[MAX_SD_DISK_FILES][MAX_SD_FILENAME_LEN];
 extern int gb_sd_disk_count;
 
 struct CardputerSdDisk {

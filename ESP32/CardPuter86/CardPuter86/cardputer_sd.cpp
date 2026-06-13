@@ -12,10 +12,20 @@ static bool sd_available = false;
 static SPIClass sd_spi;
 static USBMSC *sd_usb_msc = nullptr;
 static uint8_t sd_usb_sector[512];
+static char sd_default_disk[MAX_SD_FILENAME_LEN];
 
-char gb_sd_disk_files[MAX_SD_DISK_FILES][MAX_SD_FILENAME_LEN];
 int gb_sd_disk_count = 0;
 CardputerSdDisk gb_sd_disk = {};
+
+static void store_disk_path(char *destination, const char *name) {
+    if (name[0] != '/') {
+        destination[0] = '/';
+        strncpy(destination + 1, name, MAX_SD_FILENAME_LEN - 2);
+    } else {
+        strncpy(destination, name, MAX_SD_FILENAME_LEN - 1);
+    }
+    destination[MAX_SD_FILENAME_LEN - 1] = '\0';
+}
 
 static bool sd_card_responds(void) {
     sd_spi.begin(SD_CLK, SD_MISO, SD_MOSI, SD_CS);
@@ -196,6 +206,7 @@ bool cardputer_sd_init(void) {
     sd_available = false;
     gb_sd_disk = {};
     gb_sd_disk_count = 0;
+    sd_default_disk[0] = '\0';
 
     // Cardputer has no card-detect switch. Probe CMD0 with a strict timeout so
     // boot continues immediately when no SD card is inserted.
@@ -232,6 +243,7 @@ int cardputer_sd_scan_disks(void) {
     if (!sd_available) return 0;
 
     gb_sd_disk_count = 0;
+    sd_default_disk[0] = '\0';
     File root = SD.open("/");
     if (!root) return 0;
 
@@ -246,21 +258,17 @@ int cardputer_sd_scan_disks(void) {
         if (len > 4) {
             const char *ext = name + len - 4;
             if (strcasecmp(ext, ".img") == 0 || strcasecmp(ext, ".dsk") == 0) {
-                if (gb_sd_disk_count < MAX_SD_DISK_FILES) {
-                    if (name[0] != '/') {
-                        gb_sd_disk_files[gb_sd_disk_count][0] = '/';
-                        strncpy(gb_sd_disk_files[gb_sd_disk_count] + 1, name,
-                                MAX_SD_FILENAME_LEN - 2);
-                    } else {
-                        strncpy(gb_sd_disk_files[gb_sd_disk_count], name,
-                                MAX_SD_FILENAME_LEN - 1);
-                    }
-                    gb_sd_disk_files[gb_sd_disk_count][MAX_SD_FILENAME_LEN - 1] = '\0';
-#ifdef use_lib_log_serial
-                    Serial.printf("SD disk[%d]: %s\n", gb_sd_disk_count, name);
-#endif
-                    gb_sd_disk_count++;
+                if (gb_sd_disk_count == 0 ||
+                    strcasecmp(name[0] == '/' ? name + 1 : name,
+                               "cardputer86.img") == 0 ||
+                    strcasecmp(name[0] == '/' ? name + 1 : name,
+                               "cardputer86.dsk") == 0) {
+                    store_disk_path(sd_default_disk, name);
                 }
+#ifdef use_lib_log_serial
+                Serial.printf("SD disk[%d]: %s\n", gb_sd_disk_count, name);
+#endif
+                gb_sd_disk_count++;
             }
         }
         entry.close();
@@ -307,26 +315,15 @@ bool cardputer_sd_write_sector(const char *filename, unsigned long lba, const un
 
 bool cardputer_sd_mount_default_disk(void) {
     gb_sd_disk = {};
-    if (!sd_available || gb_sd_disk_count == 0) return false;
+    if (!sd_available || gb_sd_disk_count == 0 || !sd_default_disk[0]) return false;
 
-    int selected = 0;
-    for (int i = 0; i < gb_sd_disk_count; i++) {
-        const char *name = strrchr(gb_sd_disk_files[i], '/');
-        name = name ? name + 1 : gb_sd_disk_files[i];
-        if (strcasecmp(name, "cardputer86.img") == 0 ||
-            strcasecmp(name, "cardputer86.dsk") == 0) {
-            selected = i;
-            break;
-        }
-    }
-
-    File f = SD.open(gb_sd_disk_files[selected], FILE_READ);
+    File f = SD.open(sd_default_disk, FILE_READ);
     if (!f) return false;
     uint32_t size = f.size();
     f.close();
     if (size < 512 || (size % 512) != 0) return false;
 
-    strncpy(gb_sd_disk.filename, gb_sd_disk_files[selected], MAX_SD_FILENAME_LEN - 1);
+    strncpy(gb_sd_disk.filename, sd_default_disk, MAX_SD_FILENAME_LEN - 1);
     gb_sd_disk.filename[MAX_SD_FILENAME_LEN - 1] = '\0';
     set_disk_geometry(size);
     gb_sd_disk.mounted = true;
