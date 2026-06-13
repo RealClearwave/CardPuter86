@@ -88,7 +88,7 @@ void cardputer_kbd_fill_keymap(void) {
 
     // Modifiers
     // The physical Aa key is exposed as "shift" by M5Cardputer.
-    if (s.shift) keymap[PS2_KC_CAPS] = 0;
+    if (s.shift) keymap[PS2_KC_L_SHIFT] = 0;
     if (s.ctrl)  keymap[PS2_KC_CTRL]    = 0;
     if (s.alt)   keymap[PS2_KC_ALT]     = 0;
 
@@ -104,8 +104,8 @@ void cardputer_kbd_fill_keymap(void) {
         if (sc) keymap[sc] = 0;
     }
 
-    // CardPuter86 function layer: Opt+1..0,-,= maps to F1..F12.
-    if (s.opt) {
+    // CardPuter86 function layer: Fn+1..0,-,= maps to F1..F12.
+    if (s.fn) {
         static const char layer_keys[] = "1234567890-=";
         static const uint8_t base_scancodes[] = {
             PS2_KC_1, PS2_KC_2, PS2_KC_3, PS2_KC_4, PS2_KC_5,

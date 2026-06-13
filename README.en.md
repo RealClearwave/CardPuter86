@@ -21,7 +21,7 @@ The repository-level `flash.sh` script can also build, detect the USB serial por
 
 ## Controls
 
-The regular Cardputer keys map to the corresponding PC keys. The Aa key maps to Caps Lock, while Ctrl and Alt act as PC modifiers. Opt is the CardPuter86 function layer: Opt+1 through Opt+0 send F1-F10, Opt+- sends F11, and Opt+= sends F12. Fn is reserved. G0 switches between the default 1:1 text display and full-screen graphics scaling. Text overflow wraps without shrinking, and tall output follows the bottom of the content.
+The regular Cardputer keys map to the corresponding PC keys. The Aa key maps to Shift, while Ctrl and Alt act as PC modifiers. Fn is the CardPuter86 function layer: Fn+1 through Fn+0 send F1-F10, Fn+- sends F11, and Fn+= sends F12. Opt switches between the default 1:1 text display and full-screen graphics scaling. Text overflow wraps without shrinking, and tall output follows the bottom of the content. G0 is reserved.
 
 ## Embedded software
 

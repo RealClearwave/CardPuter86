@@ -41,15 +41,15 @@ The script builds the project, detects the serial device and asks for confirmati
 
 ## Keyboard
 
-- `Opt` + `1` through `0`: F1 through F10
-- `Opt` + `-`: F11
-- `Opt` + `=`: F12
-- `Aa`: Caps Lock
+- `Fn` + `1` through `0`: F1 through F10
+- `Fn` + `-`: F11
+- `Fn` + `=`: F12
+- `Aa`: Shift
 - `Ctrl`, `Alt`: corresponding PC modifier keys
-- `Fn`: reserved for future CardPuter86 functions
-- `G0`: switch between the default 1:1 text display and full-screen graphics scaling. Text overflow wraps to the next line, and tall output follows the newest content at the bottom.
+- `Opt`: switch between the default 1:1 text display and full-screen graphics scaling. Text overflow wraps to the next line, and tall output follows the newest content at the bottom.
+- `G0`: reserved
 
-Opt combinations replace their base keys, so `Opt+1` sends only F1 rather than both `1` and F1.
+Fn combinations replace their base keys, so `Fn+1` sends only F1 rather than both `1` and F1.
 
 ## Documentation
 

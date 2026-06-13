@@ -22,6 +22,7 @@ enum CardputerDisplayMode {
 };
 
 static CardputerDisplayMode display_mode = DISPLAY_MODE_TEXT;
+static bool opt_was_pressed = false;
 
 // ===============================================
 // Convert 6-bit VGA color (2bpc: RRGGBB) to RGB565
@@ -96,6 +97,9 @@ static void build_palette(const unsigned char *vga_colors, unsigned short int *r
 // Initialize TFT display and framebuffer
 // ===============================================
 void cardputer_display_init(void) {
+    display_mode = DISPLAY_MODE_TEXT;
+    opt_was_pressed = false;
+
     // 1. Init M5Cardputer
     auto cfg = M5.config();
     cfg.serial_baudrate = 115200;
@@ -295,11 +299,13 @@ void cardputer_update(void) {
 }
 
 void cardputer_display_update_mode_button(void) {
-    if (M5Cardputer.BtnA.wasPressed()) {
+    const bool opt_pressed = M5Cardputer.Keyboard.keysState().opt;
+    if (opt_pressed && !opt_was_pressed) {
         display_mode = display_mode == DISPLAY_MODE_TEXT
             ? DISPLAY_MODE_GRAPHICS
             : DISPLAY_MODE_TEXT;
     }
+    opt_was_pressed = opt_pressed;
 }
 
 // ===============================================

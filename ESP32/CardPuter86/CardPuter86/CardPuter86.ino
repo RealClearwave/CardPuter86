@@ -301,7 +301,6 @@ unsigned char TraduceTecla(unsigned char aux) {
         case PS2_KC_R_SHIFT: aRet = 54; break;
         case PS2_KC_CTRL: aRet = 29; break;
         case PS2_KC_ALT: aRet = 56; break;
-        case PS2_KC_CAPS: aRet = 58; break;
         case PS2_KC_MINUS: aRet = 12; break;
         case PS2_KC_EQUAL: aRet = 13; break;
         case PS2_KC_OPEN_SQ: aRet = 26; break;
@@ -421,7 +420,7 @@ void handleinput() {
         PS2_KC_0, PS2_KC_1, PS2_KC_2, PS2_KC_3, PS2_KC_4,
         PS2_KC_5, PS2_KC_6, PS2_KC_7, PS2_KC_8, PS2_KC_9,
         PS2_KC_ENTER, PS2_KC_SPACE, PS2_KC_BS, PS2_KC_TAB, PS2_KC_ESC,
-        PS2_KC_L_SHIFT, PS2_KC_CTRL, PS2_KC_ALT, PS2_KC_CAPS,
+        PS2_KC_L_SHIFT, PS2_KC_CTRL, PS2_KC_ALT,
         PS2_KC_MINUS, PS2_KC_EQUAL, PS2_KC_OPEN_SQ, PS2_KC_CLOSE_SQ,
         PS2_KC_SEMI, PS2_KC_APOS, PS2_KC_SINGLE, PS2_KC_BACK,
         PS2_KC_COMMA, PS2_KC_DOT, PS2_KC_DIV, PS2_KC_DELETE,
