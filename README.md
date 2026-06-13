@@ -47,7 +47,7 @@ The script builds the project, detects the serial device and asks for confirmati
 - `Aa`: Caps Lock
 - `Ctrl`, `Alt`: corresponding PC modifier keys
 - `Fn`: reserved for future CardPuter86 functions
-- `G0`: switch between the default content-aware text display and full-screen graphics scaling
+- `G0`: switch between the default 1:1 text display and full-screen graphics scaling. Text overflow wraps to the next line, and tall output follows the newest content at the bottom.
 
 Opt combinations replace their base keys, so `Opt+1` sends only F1 rather than both `1` and F1.
 
