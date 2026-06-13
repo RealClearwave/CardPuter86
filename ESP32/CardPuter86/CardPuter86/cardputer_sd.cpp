@@ -10,7 +10,7 @@
 
 static bool sd_available = false;
 static SPIClass sd_spi;
-static USBMSC sd_usb_msc;
+static USBMSC *sd_usb_msc = nullptr;
 static uint8_t sd_usb_sector[512];
 
 char gb_sd_disk_files[MAX_SD_DISK_FILES][MAX_SD_FILENAME_LEN];
@@ -86,7 +86,7 @@ static int32_t usb_msc_write(uint32_t lba, uint32_t offset,
 static bool usb_msc_start_stop(uint8_t power_condition, bool start,
                                bool load_eject) {
     (void)power_condition;
-    sd_usb_msc.mediaPresent(!load_eject || start);
+    if (sd_usb_msc) sd_usb_msc->mediaPresent(!load_eject || start);
     return true;
 }
 
@@ -127,14 +127,28 @@ bool cardputer_sd_enter_usb_mode_if_requested(void) {
     }
 
     uint32_t sector_count = SD.cardSize() / 512;
-    sd_usb_msc.vendorID("M5Stack");
-    sd_usb_msc.productID("CardPuter86 SD");
-    sd_usb_msc.productRevision("1.0");
-    sd_usb_msc.onStartStop(usb_msc_start_stop);
-    sd_usb_msc.onRead(usb_msc_read);
-    sd_usb_msc.onWrite(usb_msc_write);
-    sd_usb_msc.mediaPresent(true);
-    sd_usb_msc.begin(sector_count, 512);
+    sd_usb_msc = new USBMSC();
+    if (!sd_usb_msc) {
+        M5Cardputer.Display.setCursor(8, 84);
+        M5Cardputer.Display.setTextColor(TFT_RED, TFT_BLACK);
+        M5Cardputer.Display.print("USB storage init failed");
+        delay(1500);
+        SD.end();
+        return false;
+    }
+    sd_usb_msc->vendorID("M5Stack");
+    sd_usb_msc->productID("CardPuter86 SD");
+    sd_usb_msc->productRevision("1.0");
+    sd_usb_msc->onStartStop(usb_msc_start_stop);
+    sd_usb_msc->onRead(usb_msc_read);
+    sd_usb_msc->onWrite(usb_msc_write);
+    sd_usb_msc->mediaPresent(true);
+    if (!sd_usb_msc->begin(sector_count, 512)) {
+        delete sd_usb_msc;
+        sd_usb_msc = nullptr;
+        SD.end();
+        return false;
+    }
     USB.productName("CardPuter86 SD Card");
     USB.begin();
 
