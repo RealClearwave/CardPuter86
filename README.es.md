@@ -21,9 +21,9 @@ Para la primera instalacion, cargue el firmware e inicialice la particion IMG in
 
 ## Controles
 
-Las teclas normales del Cardputer corresponden a las teclas del PC. La tecla Aa corresponde a Shift, mientras que Ctrl y Alt funcionan como modificadores. Fn es la capa de funciones de CardPuter86: Fn+1 hasta Fn+0 envían F1-F10, Fn+- envía F11 y Fn+= envía F12. Opt cambia entre el modo de texto con la fuente original y el modo escalado. El modo texto conserva el framebuffer 4x8 original con ajuste de línea y seguimiento de la parte inferior; el modo escalado usa una fuente 3x5 para las pantallas de texto y escala las pantallas gráficas a toda la LCD. G0 queda reservado.
+Las teclas normales del Cardputer corresponden a las teclas del PC. La tecla Aa corresponde a Shift, mientras que Ctrl y Alt funcionan como modificadores. Fn es la capa de funciones de CardPuter86: Fn+1 hasta Fn+0 envían F1-F10, Fn+- envía F11 y Fn+= envía F12. En el modo de texto predeterminado al estilo DSx86, Fn+;, Fn+., Fn+, y Fn+/ desplazan la vista 40x16 hacia arriba, abajo, izquierda y derecha. Opt cambia entre este modo de texto legible con celdas 6x8 y el modo escalado. El modo escalado usa una fuente 3x5 para las pantallas de texto y escala las pantallas gráficas a toda la LCD. G0 queda reservado.
 
-La vista de texto escalada usa [Tom Thumb](https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5) de Robey Pointer, publicada bajo CC0.
+La vista de texto predeterminada usa los [glifos Adafruit Classic 5x7](https://github.com/adafruit/Adafruit-GFX-Library/blob/master/glcdfont.c) con licencia BSD en celdas 6x8. La vista de texto escalada usa [Tom Thumb](https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5) de Robey Pointer, publicada bajo CC0.
 
 ## Imagenes de disco
 

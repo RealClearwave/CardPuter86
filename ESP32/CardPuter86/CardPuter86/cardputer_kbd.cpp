@@ -2,6 +2,7 @@
 // Fills keymap[256] with PS/2 scancodes for the emulator.
 
 #include "cardputer_kbd.h"
+#include "cardputer_display.h"
 #include "hardware.h"
 #include "gbConfig.h"
 #include "gbGlobals.h"
@@ -121,6 +122,17 @@ void cardputer_kbd_fill_keymap(void) {
             if (M5Cardputer.Keyboard.isKeyPressed(layer_keys[i])) {
                 keymap[base_scancodes[i]] = 1;
                 keymap[function_scancodes[i]] = 0;
+            }
+        }
+
+        // The DSx86-style text viewport reserves Fn+; , . / for scrolling.
+        if (cardputer_display_navigation_active()) {
+            static const char navigation_keys[] = ";,./";
+            for (char key : navigation_keys) {
+                if (key != '\0' && M5Cardputer.Keyboard.isKeyPressed(key)) {
+                    const uint8_t scancode = char_to_sc(key);
+                    if (scancode) keymap[scancode] = 1;
+                }
             }
         }
     }

@@ -4,6 +4,7 @@
 #include "gbGlobals.h"
 #include "TomThumb3x5.h"
 #include <M5Cardputer.h>
+#include <lgfx/Fonts/glcdfont.h>
 
 // ===============================================
 // RGB565 palette for TFT — 16 CGA colors
@@ -24,6 +25,13 @@ enum CardputerDisplayMode {
 
 static CardputerDisplayMode display_mode = DISPLAY_MODE_TEXT;
 static bool opt_was_pressed = false;
+static bool last_emulated_graphics_mode = false;
+static int text_view_col = 0;
+static int text_view_row = 0;
+static bool nav_up_was_pressed = false;
+static bool nav_down_was_pressed = false;
+static bool nav_left_was_pressed = false;
+static bool nav_right_was_pressed = false;
 
 extern uint16_t cols, rows;
 
@@ -102,6 +110,9 @@ static void build_palette(const unsigned char *vga_colors, unsigned short int *r
 void cardputer_display_init(void) {
     display_mode = DISPLAY_MODE_TEXT;
     opt_was_pressed = false;
+    last_emulated_graphics_mode = false;
+    text_view_col = 0;
+    text_view_row = 0;
 
     // 1. Init M5Cardputer
     auto cfg = M5.config();
@@ -183,15 +194,10 @@ void cardputer_display_clear(unsigned char color_index) {
 }
 
 // ===============================================
-struct TextDisplayRow {
-    int source_x;
-    int source_y;
-};
-
 // Blit the emulator framebuffer to the Cardputer display.
-// Text mode keeps the original 4x8 framebuffer at 1:1, wrapping horizontal
-// overflow and following the bottom of content. Scaled mode uses Tom Thumb
-// 3x5 for text screens and fits graphics screens to the complete LCD.
+// Text mode follows the DSx86 layout: a 40x16 viewport using the classic
+// 5x7 glyph in a 6x8 cell. Scaled mode uses Tom Thumb 3x5 for text screens
+// and fits graphics screens to the complete LCD.
 // ===============================================
 void tft_blit_scaled(bool emulated_graphics_mode) {
     if (!gb_frame_buffer) return;
@@ -203,6 +209,7 @@ void tft_blit_scaled(bool emulated_graphics_mode) {
     int dw = gb_tft_sprite->width();
     int dh = gb_tft_sprite->height();
     const int sprite_stride = (dw + 1) / 2;
+    last_emulated_graphics_mode = emulated_graphics_mode;
 
     const unsigned short int *palette = emulated_graphics_mode
         ? gb_palette_rgb565
@@ -262,67 +269,54 @@ void tft_blit_scaled(bool emulated_graphics_mode) {
             }
         }
     } else {
-        static const int text_row_height = 8;
-        static const int max_wrapped_rows =
-            (FAKE86_FB_H / text_row_height) * 2;
-        TextDisplayRow wrapped_rows[max_wrapped_rows];
-        int wrapped_count = 0;
-        int last_content_y = -1;
+        static const int viewport_cols = 40;
+        static const int viewport_rows = 16;
+        static const int cell_width = 6;
+        static const int cell_height = 8;
+        const int source_cols = cols > 80 ? 80 : cols;
+        const int source_rows = rows > 25 ? 25 : rows;
+        const int max_view_col = source_cols > viewport_cols
+            ? source_cols - viewport_cols
+            : 0;
+        const int max_view_row = source_rows > viewport_rows
+            ? source_rows - viewport_rows
+            : 0;
+        if (text_view_col > max_view_col) text_view_col = max_view_col;
+        if (text_view_row > max_view_row) text_view_row = max_view_row;
 
-        for (int y = 0; y < FAKE86_FB_H; y++) {
-            const unsigned char *src = gb_frame_buffer + y * FAKE86_FB_W;
-            for (int x = 0; x < FAKE86_FB_W; x++) {
-                if ((src[x] & 0x0F) != 0) {
-                    last_content_y = y;
-                    break;
+        memset(sprite_buf, 0, sprite_stride * dh);
+        const int y_offset = (dh - viewport_rows * cell_height) / 2;
+        for (int row = 0; row < viewport_rows; row++) {
+            const int source_row = text_view_row + row;
+            if (source_row >= source_rows) break;
+            for (int col = 0; col < viewport_cols; col++) {
+                const int source_col = text_view_col + col;
+                if (source_col >= source_cols) break;
+                const int offset = (source_row * 80 + source_col) * 2;
+                const unsigned char character = gb_video_cga[offset];
+                const unsigned char attribute = gb_video_cga[offset + 1];
+                unsigned char foreground = attribute & 0x0F;
+                unsigned char background = (attribute >> 4) & 0x07;
+                if (gb_invert_color) {
+                    const unsigned char swap = foreground;
+                    foreground = background;
+                    background = swap;
                 }
-            }
-        }
 
-        const int source_text_rows = last_content_y < 0
-            ? 0
-            : (last_content_y / text_row_height) + 1;
-
-        for (int row = 0; row < source_text_rows; row++) {
-            const int source_y = row * text_row_height;
-            wrapped_rows[wrapped_count++] = {0, source_y};
-
-            bool has_overflow = false;
-            for (int y = 0; y < text_row_height && !has_overflow; y++) {
-                const unsigned char *src =
-                    gb_frame_buffer + (source_y + y) * FAKE86_FB_W;
-                for (int x = dw; x < FAKE86_FB_W; x++) {
-                    if ((src[x] & 0x0F) != 0) {
-                        has_overflow = true;
-                        break;
+                for (int gy = 0; gy < cell_height; gy++) {
+                    const int y = y_offset + row * cell_height + gy;
+                    for (int gx = 0; gx < cell_width; gx++) {
+                        const int x = col * cell_width + gx;
+                        const bool glyph_pixel = gx < 5 &&
+                            (font[character * 5 + gx] & (1 << gy));
+                        const unsigned char color = glyph_pixel
+                            ? foreground
+                            : background;
+                        unsigned char &packed = sprite_buf[y * sprite_stride + x / 2];
+                        if (x & 1) packed = (packed & 0xF0) | color;
+                        else packed = (packed & 0x0F) | (color << 4);
                     }
                 }
-            }
-            if (has_overflow) wrapped_rows[wrapped_count++] = {dw, source_y};
-        }
-
-        const int wrapped_height = wrapped_count * text_row_height;
-        const int first_virtual_y = wrapped_height > dh ? wrapped_height - dh : 0;
-
-        for (int y = 0; y < dh; y++) {
-            unsigned char *dst = sprite_buf + y * sprite_stride;
-            memset(dst, 0, sprite_stride);
-            const int virtual_y = first_virtual_y + y;
-            if (virtual_y >= wrapped_height) continue;
-
-            const TextDisplayRow &row = wrapped_rows[virtual_y / text_row_height];
-            const int source_y = row.source_y + (virtual_y % text_row_height);
-            const unsigned char *src =
-                gb_frame_buffer + source_y * FAKE86_FB_W + row.source_x;
-            const int copy_width = FAKE86_FB_W - row.source_x < dw
-                ? FAKE86_FB_W - row.source_x
-                : dw;
-            for (int x = 0; x < copy_width; x += 2) {
-                const unsigned char color0 = src[x] & 0x0F;
-                const unsigned char color1 = x + 1 < copy_width
-                    ? src[x + 1] & 0x0F
-                    : 0;
-                dst[x / 2] = (color0 << 4) | color1;
             }
         }
     }
@@ -338,13 +332,40 @@ void cardputer_update(void) {
 }
 
 void cardputer_display_update_mode_button(void) {
-    const bool opt_pressed = M5Cardputer.Keyboard.keysState().opt;
+    const Keyboard_Class::KeysState &state = M5Cardputer.Keyboard.keysState();
+    const bool opt_pressed = state.opt;
     if (opt_pressed && !opt_was_pressed) {
         display_mode = display_mode == DISPLAY_MODE_TEXT
             ? DISPLAY_MODE_SCALED
             : DISPLAY_MODE_TEXT;
     }
     opt_was_pressed = opt_pressed;
+
+    const bool navigation_active = cardputer_display_navigation_active();
+    const bool up_pressed = navigation_active && state.fn &&
+        M5Cardputer.Keyboard.isKeyPressed(';');
+    const bool down_pressed = navigation_active && state.fn &&
+        M5Cardputer.Keyboard.isKeyPressed('.');
+    const bool left_pressed = navigation_active && state.fn &&
+        M5Cardputer.Keyboard.isKeyPressed(',');
+    const bool right_pressed = navigation_active && state.fn &&
+        M5Cardputer.Keyboard.isKeyPressed('/');
+
+    const int max_view_col = cols > 40 ? (cols > 80 ? 40 : cols - 40) : 0;
+    const int max_view_row = rows > 16 ? (rows > 25 ? 9 : rows - 16) : 0;
+    if (up_pressed && !nav_up_was_pressed && text_view_row > 0) text_view_row--;
+    if (down_pressed && !nav_down_was_pressed && text_view_row < max_view_row) text_view_row++;
+    if (left_pressed && !nav_left_was_pressed && text_view_col > 0) text_view_col--;
+    if (right_pressed && !nav_right_was_pressed && text_view_col < max_view_col) text_view_col++;
+
+    nav_up_was_pressed = up_pressed;
+    nav_down_was_pressed = down_pressed;
+    nav_left_was_pressed = left_pressed;
+    nav_right_was_pressed = right_pressed;
+}
+
+bool cardputer_display_navigation_active(void) {
+    return display_mode == DISPLAY_MODE_TEXT && !last_emulated_graphics_mode;
 }
 
 // ===============================================

@@ -5,7 +5,7 @@ CardPuter86 is an 8086 PC emulator for the M5Stack Cardputer (ESP32-S3), based o
 ## Features
 
 - M5Stack Cardputer keyboard support
-- ST7789 LCD output with original-size text and full-screen scaled modes
+- ST7789 LCD output with a DSx86-style 40x16 text viewport and full-screen scaled modes
 - PC speaker output through the Cardputer I2S speaker
 - Built-in BIOS, BASIC ROM and COM program support
 - Independent writable IMG storage on internal Flash and microSD
@@ -53,10 +53,11 @@ For the first installation, initialize the internal IMG partition:
 - `Fn` + `=`: F12
 - `Aa`: Shift
 - `Ctrl`, `Alt`: corresponding PC modifier keys
-- `Opt`: switch between the default original-font text mode and scaled mode. Text mode keeps the original 4x8 framebuffer size with wrapping and bottom-follow; scaled mode uses a 3x5 font for text screens and scales graphics screens to the full LCD.
+- `Fn` + `;`, `.`, `,`, `/`: scroll the 40x16 text viewport up, down, left, and right
+- `Opt`: switch between the default DSx86-style text mode and scaled mode. Text mode uses a readable 6x8 cell and supports viewport scrolling; scaled mode uses a 3x5 font for text screens and scales graphics screens to the full LCD.
 - `G0`: reserved
 
-The scaled text view uses [Tom Thumb](https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5) by Robey Pointer, released under CC0.
+The default text view uses the BSD-licensed [Adafruit Classic 5x7 glyphs](https://github.com/adafruit/Adafruit-GFX-Library/blob/master/glcdfont.c) in 6x8 cells. The scaled text view uses [Tom Thumb](https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5) by Robey Pointer, released under CC0.
 
 Fn combinations replace their base keys, so `Fn+1` sends only F1 rather than both `1` and F1.
 

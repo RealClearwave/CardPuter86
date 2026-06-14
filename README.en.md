@@ -21,9 +21,9 @@ For a first install, upload the firmware and initialize the internal IMG partiti
 
 ## Controls
 
-The regular Cardputer keys map to the corresponding PC keys. The Aa key maps to Shift, while Ctrl and Alt act as PC modifiers. Fn is the CardPuter86 function layer: Fn+1 through Fn+0 send F1-F10, Fn+- sends F11, and Fn+= sends F12. Opt switches between the default original-font text mode and scaled mode. Text mode keeps the original 4x8 framebuffer size with wrapping and bottom-follow; scaled mode uses a 3x5 font for text screens and scales graphics screens to the full LCD. G0 is reserved.
+The regular Cardputer keys map to the corresponding PC keys. The Aa key maps to Shift, while Ctrl and Alt act as PC modifiers. Fn is the CardPuter86 function layer: Fn+1 through Fn+0 send F1-F10, Fn+- sends F11, and Fn+= sends F12. In the default DSx86-style text mode, Fn+;, Fn+., Fn+,, and Fn+/ scroll the 40x16 viewport up, down, left, and right. Opt switches between this readable 6x8-cell text mode and scaled mode. Scaled mode uses a 3x5 font for text screens and scales graphics screens to the full LCD. G0 is reserved.
 
-The scaled text view uses [Tom Thumb](https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5) by Robey Pointer, released under CC0.
+The default text view uses the BSD-licensed [Adafruit Classic 5x7 glyphs](https://github.com/adafruit/Adafruit-GFX-Library/blob/master/glcdfont.c) in 6x8 cells. The scaled text view uses [Tom Thumb](https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5) by Robey Pointer, released under CC0.
 
 ## Disk Images
 
