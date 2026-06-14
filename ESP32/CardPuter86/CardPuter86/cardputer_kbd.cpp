@@ -125,15 +125,17 @@ void cardputer_kbd_fill_keymap(void) {
             }
         }
 
-        // The DSx86-style text viewport reserves Fn+; , . / for scrolling.
+        // The text viewport reserves Fn+; , . / for scrolling, Fn+' for the
+        // fixed-mode origin, and Fn+Space for returning to automatic mode.
         if (cardputer_display_navigation_active()) {
-            static const char navigation_keys[] = ";,./";
+            static const char navigation_keys[] = ";,./'";
             for (char key : navigation_keys) {
                 if (key != '\0' && M5Cardputer.Keyboard.isKeyPressed(key)) {
                     const uint8_t scancode = char_to_sc(key);
                     if (scancode) keymap[scancode] = 1;
                 }
             }
+            if (s.space) keymap[PS2_KC_SPACE] = 1;
         }
     }
 }

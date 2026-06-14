@@ -54,10 +54,14 @@ For the first installation, initialize the internal IMG partition:
 - `Aa`: Shift
 - `Ctrl`, `Alt`: corresponding PC modifier keys
 - `Fn` + `;`, `.`, `,`, `/`: scroll the 40x16 text viewport up, down, left, and right
+- `Fn` + `'`: return a FIXED viewport to its top-left starting position
+- `Fn` + `Space`: return the text viewport to automatic follow mode
 - `Opt`: switch between the default DSx86-style text mode and scaled mode. Text mode uses a readable 6x8 cell and supports viewport scrolling; scaled mode uses a 3x5 font for text screens and scales graphics screens to the full LCD.
 - `G0`: reserved
 
 The default text view uses the BSD-licensed [Adafruit Classic 5x7 glyphs](https://github.com/adafruit/Adafruit-GFX-Library/blob/master/glcdfont.c) in 6x8 cells. The scaled text view uses [Tom Thumb](https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5) by Robey Pointer, released under CC0.
+
+Text mode starts in AUTO mode and follows the last content line while keeping up to two detected bottom status rows pinned. Manual scrolling switches to FIXED mode; `Fn+Space` restores AUTO.
 
 Fn combinations replace their base keys, so `Fn+1` sends only F1 rather than both `1` and F1.
 

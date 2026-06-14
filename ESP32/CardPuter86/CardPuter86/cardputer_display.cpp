@@ -32,8 +32,50 @@ static bool nav_up_was_pressed = false;
 static bool nav_down_was_pressed = false;
 static bool nav_left_was_pressed = false;
 static bool nav_right_was_pressed = false;
+static bool nav_auto_was_pressed = false;
+static bool nav_home_was_pressed = false;
+static bool text_auto_scroll = true;
 
-extern uint16_t cols, rows;
+extern uint16_t cursy, cols, rows;
+
+static const int TEXT_VIEW_COLS = 40;
+static const int TEXT_VIEW_ROWS = 16;
+
+static bool text_row_has_content(int row, int source_cols) {
+    for (int col = 0; col < source_cols; col++) {
+        const unsigned char character = gb_video_cga[(row * 80 + col) * 2];
+        if (character != 0 && character != ' ') return true;
+    }
+    return false;
+}
+
+static bool text_row_looks_like_status_bar(int row, int source_cols) {
+    int text_cells = 0;
+    int colored_background_cells = 0;
+    for (int col = 0; col < source_cols; col++) {
+        const int offset = (row * 80 + col) * 2;
+        const unsigned char character = gb_video_cga[offset];
+        const unsigned char attribute = gb_video_cga[offset + 1];
+        if (character != 0 && character != ' ') text_cells++;
+        if ((attribute & 0x70) != 0) colored_background_cells++;
+    }
+
+    const int colored_threshold = source_cols / 3;
+    const int dense_text_threshold = (source_cols * 3) / 4;
+    return colored_background_cells >= colored_threshold ||
+           text_cells >= dense_text_threshold;
+}
+
+static int detect_pinned_status_rows(int source_cols, int source_rows) {
+    int pinned_rows = 0;
+    for (int row = source_rows - 1;
+         row >= 0 && pinned_rows < 2;
+         row--) {
+        if (!text_row_looks_like_status_bar(row, source_cols)) break;
+        pinned_rows++;
+    }
+    return pinned_rows;
+}
 
 // ===============================================
 // Convert 6-bit VGA color (2bpc: RRGGBB) to RGB565
@@ -113,6 +155,7 @@ void cardputer_display_init(void) {
     last_emulated_graphics_mode = false;
     text_view_col = 0;
     text_view_row = 0;
+    text_auto_scroll = true;
 
     // 1. Init M5Cardputer
     auto cfg = M5.config();
@@ -269,27 +312,43 @@ void tft_blit_scaled(bool emulated_graphics_mode) {
             }
         }
     } else {
-        static const int viewport_cols = 40;
-        static const int viewport_rows = 16;
         static const int cell_width = 6;
         static const int cell_height = 8;
         const int source_cols = cols > 80 ? 80 : cols;
         const int source_rows = rows > 25 ? 25 : rows;
-        const int max_view_col = source_cols > viewport_cols
-            ? source_cols - viewport_cols
+        const int pinned_rows = detect_pinned_status_rows(source_cols, source_rows);
+        const int body_source_rows = source_rows - pinned_rows;
+        const int body_view_rows = TEXT_VIEW_ROWS - pinned_rows;
+        const int max_view_col = source_cols > TEXT_VIEW_COLS
+            ? source_cols - TEXT_VIEW_COLS
             : 0;
-        const int max_view_row = source_rows > viewport_rows
-            ? source_rows - viewport_rows
+        const int max_view_row = body_source_rows > body_view_rows
+            ? body_source_rows - body_view_rows
             : 0;
         if (text_view_col > max_view_col) text_view_col = max_view_col;
-        if (text_view_row > max_view_row) text_view_row = max_view_row;
+        if (text_auto_scroll) {
+            int last_content_row = -1;
+            for (int row = 0; row < body_source_rows; row++) {
+                if (text_row_has_content(row, source_cols)) last_content_row = row;
+            }
+            if (cursy < body_source_rows && cursy > last_content_row) {
+                last_content_row = cursy;
+            }
+            text_view_row = last_content_row >= body_view_rows
+                ? last_content_row - body_view_rows + 1
+                : 0;
+        } else if (text_view_row > max_view_row) {
+            text_view_row = max_view_row;
+        }
 
         memset(sprite_buf, 0, sprite_stride * dh);
-        const int y_offset = (dh - viewport_rows * cell_height) / 2;
-        for (int row = 0; row < viewport_rows; row++) {
-            const int source_row = text_view_row + row;
+        const int y_offset = (dh - TEXT_VIEW_ROWS * cell_height) / 2;
+        for (int row = 0; row < TEXT_VIEW_ROWS; row++) {
+            const int source_row = row < body_view_rows
+                ? text_view_row + row
+                : body_source_rows + (row - body_view_rows);
             if (source_row >= source_rows) break;
-            for (int col = 0; col < viewport_cols; col++) {
+            for (int col = 0; col < TEXT_VIEW_COLS; col++) {
                 const int source_col = text_view_col + col;
                 if (source_col >= source_cols) break;
                 const int offset = (source_row * 80 + source_col) * 2;
@@ -319,6 +378,7 @@ void tft_blit_scaled(bool emulated_graphics_mode) {
                 }
             }
         }
+
     }
 
     gb_tft_sprite->pushSprite(0, 0);
@@ -350,18 +410,50 @@ void cardputer_display_update_mode_button(void) {
         M5Cardputer.Keyboard.isKeyPressed(',');
     const bool right_pressed = navigation_active && state.fn &&
         M5Cardputer.Keyboard.isKeyPressed('/');
+    const bool auto_pressed = navigation_active && state.fn && state.space;
+    const bool home_pressed = navigation_active && state.fn &&
+        M5Cardputer.Keyboard.isKeyPressed('\'');
 
-    const int max_view_col = cols > 40 ? (cols > 80 ? 40 : cols - 40) : 0;
-    const int max_view_row = rows > 16 ? (rows > 25 ? 9 : rows - 16) : 0;
-    if (up_pressed && !nav_up_was_pressed && text_view_row > 0) text_view_row--;
-    if (down_pressed && !nav_down_was_pressed && text_view_row < max_view_row) text_view_row++;
-    if (left_pressed && !nav_left_was_pressed && text_view_col > 0) text_view_col--;
-    if (right_pressed && !nav_right_was_pressed && text_view_col < max_view_col) text_view_col++;
+    const int source_cols = cols > 80 ? 80 : cols;
+    const int source_rows = rows > 25 ? 25 : rows;
+    const int pinned_rows = detect_pinned_status_rows(source_cols, source_rows);
+    const int body_source_rows = source_rows - pinned_rows;
+    const int body_view_rows = TEXT_VIEW_ROWS - pinned_rows;
+    const int max_view_col = source_cols > TEXT_VIEW_COLS
+        ? source_cols - TEXT_VIEW_COLS
+        : 0;
+    const int max_view_row = body_source_rows > body_view_rows
+        ? body_source_rows - body_view_rows
+        : 0;
+
+    if (auto_pressed && !nav_auto_was_pressed) text_auto_scroll = true;
+    if (home_pressed && !nav_home_was_pressed && !text_auto_scroll) {
+        text_view_col = 0;
+        text_view_row = 0;
+    }
+    if (up_pressed && !nav_up_was_pressed) {
+        text_auto_scroll = false;
+        if (text_view_row > 0) text_view_row--;
+    }
+    if (down_pressed && !nav_down_was_pressed) {
+        text_auto_scroll = false;
+        if (text_view_row < max_view_row) text_view_row++;
+    }
+    if (left_pressed && !nav_left_was_pressed) {
+        text_auto_scroll = false;
+        if (text_view_col > 0) text_view_col--;
+    }
+    if (right_pressed && !nav_right_was_pressed) {
+        text_auto_scroll = false;
+        if (text_view_col < max_view_col) text_view_col++;
+    }
 
     nav_up_was_pressed = up_pressed;
     nav_down_was_pressed = down_pressed;
     nav_left_was_pressed = left_pressed;
     nav_right_was_pressed = right_pressed;
+    nav_auto_was_pressed = auto_pressed;
+    nav_home_was_pressed = home_pressed;
 }
 
 bool cardputer_display_navigation_active(void) {
