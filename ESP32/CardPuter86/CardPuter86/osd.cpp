@@ -6,7 +6,6 @@
 #include "gb_sdl_font8x8.h"
 #include "render.h"
 #include "dataFlash/gbsnarare.h"
-#include "dataFlash/gbdsk.h"
 #include "cpu.h"
 #include "ports.h"
 #include "cardputer_kbd.h"
@@ -82,10 +81,9 @@ const char * gb_sound_menu[max_gb_sound_menu]={
 //};
 
 
-#define max_gb_main_menu 8
+#define max_gb_main_menu 7
 const char * gb_main_menu[max_gb_main_menu]={
  "Load COM",
- "Select DSK",
  "Reset",
  "LOAD SNA RARE",
  "Speed",
@@ -346,21 +344,6 @@ unsigned char ShowTinyMenu(const char *cadTitle,const char **ptrValue,unsigned c
  gb_show_osd_main_menu= 0;
  return aReturn;
 }
-
-//Menu DSK
-void ShowTinyDSKMenu()
-{
- unsigned char aSelNum;     
- aSelNum = ShowTinyMenu("DSK",gb_list_dsk_title,max_list_dsk);
-
- //gb_cartfilename= (char *)gb_list_rom_title[aSelNum];
- gb_force_load_dsk= 1;
- if (aSelNum > (max_list_dsk-1))
-  aSelNum= max_list_dsk-1;
- gb_id_cur_dsk= aSelNum;
- //running= 0;
-}
-
 
 void ShowTinyCPUDelayMenu()
 {
@@ -686,14 +669,10 @@ void do_tinyOSD()
     gb_show_osd_main_menu=0;
     break;
    case 1:
-    ShowTinyDSKMenu();
-    gb_show_osd_main_menu=0;
-    break;
-   case 2:     
     ShowTinyResetMenu();
     gb_show_osd_main_menu=0;    
     break;
-   case 3: 
+   case 2:
 /*    //ShowTinySpeedMenu();
     didbootstrap= 1;
     gb_use_remap_cartdridge=0;
@@ -706,13 +685,13 @@ void do_tinyOSD()
 */    
     gb_show_osd_main_menu=0;    
     break;
-   case 4: ShowTinySpeedMenu(); 
+   case 3: ShowTinySpeedMenu();
     gb_show_osd_main_menu=0;   
     break;
-   case 5: ShowTinyVideoMenu(); 
+   case 4: ShowTinyVideoMenu();
     gb_show_osd_main_menu=0;
     break;   
-   case 6:
+   case 5:
     ShowTinySoundMenu();        
     gb_show_osd_main_menu=0; 
     break;

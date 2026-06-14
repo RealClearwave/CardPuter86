@@ -11,25 +11,27 @@ cd ESP32/CardPuter86
 pio run
 ```
 
-Upload with PlatformIO:
+For a first install, upload the firmware and initialize the internal IMG partition:
 
 ```sh
-pio run --target upload
+./flash.sh --with-images
 ```
 
-The repository-level `flash.sh` script can also build, detect the USB serial port and upload the firmware.
+`--with-images` erases the device and reinstalls the default image partition. Later `./flash.sh` runs update only the firmware and preserve images imported by the user.
 
 ## Controls
 
 The regular Cardputer keys map to the corresponding PC keys. The Aa key maps to Shift, while Ctrl and Alt act as PC modifiers. Fn is the CardPuter86 function layer: Fn+1 through Fn+0 send F1-F10, Fn+- sends F11, and Fn+= sends F12. Opt switches between the default 1:1 text display and full-screen graphics scaling. Text overflow wraps without shrinking, and tall output follows the bottom of the content. G0 is reserved.
 
-## SD Card
+## Disk Images
 
-Put a raw DOS disk image in the SD card root. `cardputer86.img` or `cardputer86.dsk` is preferred; otherwise the first `.img`/`.dsk` file is used. Floppy images are mounted as `B:` and images larger than 2.88 MB as `C:`. Hold `Opt` continuously for three seconds during startup to expose the entire SD card to the connected computer as a USB mass-storage device. Eject it on the computer before rebooting.
+Writable `.img` files live in an independent FAT partition in internal Flash or in the microSD root. If multiple images exist, a startup menu selects the boot image; `cardputer86.img` is the timed default. Legacy `.dsk` files are also accepted.
+
+Hold `Opt` for three seconds during startup to enter USB storage mode. With a microSD card inserted, choose internal Flash or SD; without one, internal Flash is exported automatically. Copy IMG files, safely eject the drive, and reboot.
 
 ## Embedded software
 
-ROM, disk and COM data compiled into the firmware is stored under `ESP32/CardPuter86/CardPuter86/dataFlash`. The `tools/ima2h` utility originates from ESP32TinyFake86 and can convert supported images and binaries into C headers.
+ROM and COM data compiled into the firmware is stored under `ESP32/CardPuter86/CardPuter86/dataFlash`. The default independent image is `ESP32/CardPuter86/data/cardputer86.img`.
 
 ## Upstream
 

@@ -22,8 +22,6 @@
  extern unsigned char gb_force_load_com;
  extern unsigned char gb_id_cur_com;
  extern unsigned char gb_force_boot;
- extern unsigned char gb_force_load_dsk;
- extern unsigned char gb_id_cur_dsk;
  #ifdef use_lib_snapshot
   extern unsigned char gb_force_snapshot_begin;
   extern unsigned char gb_force_snapshot_end;

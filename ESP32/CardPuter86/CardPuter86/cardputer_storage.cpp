@@ -1,0 +1,582 @@
+#include "cardputer_storage.h"
+#include "hardware.h"
+#include <Arduino.h>
+#include <M5Cardputer.h>
+#include <SD.h>
+#include <USB.h>
+#include <USBMSC.h>
+#include <dirent.h>
+#include <stdio.h>
+#include <strings.h>
+#include <sys/stat.h>
+
+extern "C" {
+#include "esp_partition.h"
+#include "esp_vfs_fat.h"
+#include "wear_levelling.h"
+}
+
+static const char *FLASH_MOUNT_POINT = "/flash";
+static const char *FLASH_PARTITION_LABEL = "disk";
+static const uint8_t MAX_BOOT_IMAGES = 20;
+
+struct BootImageEntry {
+    CardputerStorageType storage;
+    uint32_t size;
+    char path[CARDPUTER_IMAGE_PATH_LEN];
+};
+
+static SPIClass sd_spi;
+static bool sd_available = false;
+static bool flash_available = false;
+static wl_handle_t flash_wl_handle = WL_INVALID_HANDLE;
+static FILE *flash_image_file = nullptr;
+static File sd_image_file;
+static BootImageEntry boot_images[MAX_BOOT_IMAGES];
+static uint8_t boot_image_count = 0;
+
+static USBMSC *usb_msc = nullptr;
+static CardputerStorageType usb_storage = CARDPUTER_STORAGE_NONE;
+static uint8_t sd_usb_sector[512];
+static wl_handle_t usb_flash_wl = WL_INVALID_HANDLE;
+static uint8_t *usb_flash_cache = nullptr;
+static size_t usb_flash_cache_address = SIZE_MAX;
+static size_t usb_flash_cache_size = 0;
+static bool usb_flash_cache_dirty = false;
+
+CardputerDiskImage gb_disk_image = {};
+
+static bool is_image_name(const char *name) {
+    const size_t len = strlen(name);
+    if (len <= 4) return false;
+    const char *extension = name + len - 4;
+    return strcasecmp(extension, ".img") == 0 ||
+           strcasecmp(extension, ".dsk") == 0;
+}
+
+static const char *base_name(const char *path) {
+    const char *slash = strrchr(path, '/');
+    return slash ? slash + 1 : path;
+}
+
+static bool sd_card_responds(void) {
+    sd_spi.begin(SD_CLK, SD_MISO, SD_MOSI, SD_CS);
+    pinMode(SD_CS, OUTPUT);
+    digitalWrite(SD_CS, HIGH);
+
+    sd_spi.beginTransaction(SPISettings(400000, MSBFIRST, SPI_MODE0));
+    for (uint8_t i = 0; i < 10; i++) sd_spi.transfer(0xFF);
+
+    const uint32_t deadline = millis() + 150;
+    bool detected = false;
+    do {
+        digitalWrite(SD_CS, LOW);
+        sd_spi.transfer(0x40);
+        sd_spi.transfer(0x00);
+        sd_spi.transfer(0x00);
+        sd_spi.transfer(0x00);
+        sd_spi.transfer(0x00);
+        sd_spi.transfer(0x95);
+        for (uint8_t i = 0; i < 10; i++) {
+            if (sd_spi.transfer(0xFF) == 0x01) {
+                detected = true;
+                break;
+            }
+        }
+        digitalWrite(SD_CS, HIGH);
+        sd_spi.transfer(0xFF);
+        if (!detected) delay(2);
+    } while (!detected && (int32_t)(deadline - millis()) > 0);
+
+    digitalWrite(SD_CS, HIGH);
+    sd_spi.endTransaction();
+    return detected;
+}
+
+static bool mount_sd(void) {
+    if (!sd_card_responds()) {
+        sd_spi.end();
+        return false;
+    }
+    if (!SD.begin(SD_CS, sd_spi, 25000000) || SD.cardType() == CARD_NONE) {
+        SD.end();
+        sd_spi.end();
+        return false;
+    }
+    sd_available = true;
+    return true;
+}
+
+static void unmount_sd(void) {
+    if (sd_available) SD.end();
+    sd_spi.end();
+    sd_available = false;
+}
+
+static bool mount_flash(void) {
+    esp_vfs_fat_mount_config_t config = {
+        .format_if_mount_failed = false,
+        .max_files = 4,
+        .allocation_unit_size = 4096
+    };
+    if (esp_vfs_fat_spiflash_mount(FLASH_MOUNT_POINT, FLASH_PARTITION_LABEL,
+                                   &config, &flash_wl_handle) != ESP_OK) {
+        flash_wl_handle = WL_INVALID_HANDLE;
+        return false;
+    }
+    flash_available = true;
+    return true;
+}
+
+static void unmount_flash(void) {
+    if (flash_available && flash_wl_handle != WL_INVALID_HANDLE) {
+        esp_vfs_fat_spiflash_unmount(FLASH_MOUNT_POINT, flash_wl_handle);
+    }
+    flash_wl_handle = WL_INVALID_HANDLE;
+    flash_available = false;
+}
+
+static void add_boot_image(CardputerStorageType storage, const char *path,
+                           uint32_t size) {
+    if (boot_image_count >= MAX_BOOT_IMAGES || size < 512 || size % 512 != 0) return;
+    BootImageEntry &entry = boot_images[boot_image_count++];
+    entry.storage = storage;
+    entry.size = size;
+    strncpy(entry.path, path, sizeof(entry.path) - 1);
+    entry.path[sizeof(entry.path) - 1] = '\0';
+}
+
+static void scan_flash_images(void) {
+    if (!flash_available) return;
+    DIR *directory = opendir(FLASH_MOUNT_POINT);
+    if (!directory) return;
+    struct dirent *entry;
+    while ((entry = readdir(directory)) != nullptr) {
+        if (!is_image_name(entry->d_name)) continue;
+        char path[CARDPUTER_IMAGE_PATH_LEN];
+        snprintf(path, sizeof(path), "%s/%s", FLASH_MOUNT_POINT, entry->d_name);
+        struct stat info;
+        if (stat(path, &info) == 0 && S_ISREG(info.st_mode)) {
+            add_boot_image(CARDPUTER_STORAGE_FLASH, path, info.st_size);
+        }
+    }
+    closedir(directory);
+}
+
+static void scan_sd_images(void) {
+    if (!sd_available) return;
+    File root = SD.open("/");
+    if (!root) return;
+    while (true) {
+        File file = root.openNextFile();
+        if (!file) break;
+        const char *name = file.name();
+        if (!file.isDirectory() && is_image_name(name)) {
+            char path[CARDPUTER_IMAGE_PATH_LEN];
+            snprintf(path, sizeof(path), "%s%s", name[0] == '/' ? "" : "/", name);
+            add_boot_image(CARDPUTER_STORAGE_SD, path, file.size());
+        }
+        file.close();
+    }
+    root.close();
+}
+
+static void draw_menu(const char *title, const char *const *items, uint8_t count,
+                      uint8_t selected, const char *footer) {
+    auto &display = M5Cardputer.Display;
+    display.fillScreen(TFT_BLACK);
+    display.fillRect(0, 0, display.width(), 16, TFT_BLUE);
+    display.setTextColor(TFT_WHITE, TFT_BLUE);
+    display.setTextSize(1);
+    display.setCursor(4, 4);
+    display.print(title);
+
+    const uint8_t visible = 12;
+    uint8_t first = selected >= visible ? selected - visible + 1 : 0;
+    for (uint8_t row = 0; row < visible && first + row < count; row++) {
+        uint8_t index = first + row;
+        int y = 20 + row * 9;
+        if (index == selected) {
+            display.fillRect(0, y - 1, display.width(), 9, TFT_DARKGREEN);
+            display.setTextColor(TFT_WHITE, TFT_DARKGREEN);
+        } else {
+            display.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+        }
+        display.setCursor(4, y);
+        display.printf("%c %s", index == selected ? '>' : ' ', items[index]);
+    }
+    display.fillRect(0, display.height() - 10, display.width(), 10, TFT_NAVY);
+    display.setTextColor(TFT_WHITE, TFT_NAVY);
+    display.setCursor(3, display.height() - 9);
+    display.print(footer);
+}
+
+static uint8_t choose_menu(const char *title, const char *const *items,
+                           uint8_t count, uint8_t selected, bool timeout) {
+    bool previous_up = false;
+    bool previous_down = false;
+    bool previous_enter = false;
+    uint32_t deadline = millis() + 4000;
+    bool redraw = true;
+
+    while (true) {
+        M5Cardputer.update();
+        auto state = M5Cardputer.Keyboard.keysState();
+        const bool up = M5Cardputer.Keyboard.isKeyPressed('w') ||
+                        M5Cardputer.Keyboard.isKeyPressed(';');
+        const bool down = M5Cardputer.Keyboard.isKeyPressed('s') ||
+                          M5Cardputer.Keyboard.isKeyPressed('.');
+        bool enter = state.enter;
+
+        if (up && !previous_up) {
+            selected = selected == 0 ? count - 1 : selected - 1;
+            timeout = false;
+            redraw = true;
+        }
+        if (down && !previous_down) {
+            selected = (selected + 1) % count;
+            timeout = false;
+            redraw = true;
+        }
+        for (uint8_t i = 0; i < count && i < 9; i++) {
+            if (M5Cardputer.Keyboard.isKeyPressed('1' + i)) {
+                selected = i;
+                enter = true;
+                break;
+            }
+        }
+        if (enter && !previous_enter) return selected;
+        if (timeout && (int32_t)(deadline - millis()) <= 0) return selected;
+
+        if (redraw) {
+            draw_menu(title, items, count, selected,
+                      timeout ? "W/S or arrows, Enter (auto 4s)" :
+                                "W/S or arrows, Enter");
+            redraw = false;
+        }
+        previous_up = up;
+        previous_down = down;
+        previous_enter = enter;
+        delay(15);
+    }
+}
+
+static void set_disk_geometry(uint32_t size) {
+    gb_disk_image.size = size;
+    gb_disk_image.drive = 0;
+    gb_disk_image.heads = 2;
+    gb_disk_image.sectors = 18;
+    gb_disk_image.cylinders = 80;
+
+    switch (size) {
+        case 163840: gb_disk_image.heads = 1; gb_disk_image.sectors = 8; gb_disk_image.cylinders = 40; break;
+        case 184320: gb_disk_image.heads = 1; gb_disk_image.sectors = 9; gb_disk_image.cylinders = 40; break;
+        case 327680: gb_disk_image.heads = 2; gb_disk_image.sectors = 8; gb_disk_image.cylinders = 40; break;
+        case 368640: gb_disk_image.heads = 2; gb_disk_image.sectors = 9; gb_disk_image.cylinders = 40; break;
+        case 737280: gb_disk_image.heads = 2; gb_disk_image.sectors = 9; gb_disk_image.cylinders = 80; break;
+        case 1228800: gb_disk_image.heads = 2; gb_disk_image.sectors = 15; gb_disk_image.cylinders = 80; break;
+        case 1474560: gb_disk_image.heads = 2; gb_disk_image.sectors = 18; gb_disk_image.cylinders = 80; break;
+        case 2949120: gb_disk_image.heads = 2; gb_disk_image.sectors = 36; gb_disk_image.cylinders = 80; break;
+        default:
+            if (size > 2949120) {
+                gb_disk_image.drive = 0x80;
+                gb_disk_image.heads = 16;
+                gb_disk_image.sectors = 63;
+                gb_disk_image.cylinders = size / (512UL * 16UL * 63UL);
+                if (gb_disk_image.cylinders == 0) gb_disk_image.cylinders = 1;
+                if (gb_disk_image.cylinders > 1024) gb_disk_image.cylinders = 1024;
+            }
+            break;
+    }
+}
+
+static bool select_boot_image(void) {
+    if (boot_image_count == 0) {
+        unmount_sd();
+        unmount_flash();
+        return false;
+    }
+
+    uint8_t selected = 0;
+    const char *items[MAX_BOOT_IMAGES];
+    static char labels[MAX_BOOT_IMAGES][32];
+    for (uint8_t i = 0; i < boot_image_count; i++) {
+        snprintf(labels[i], sizeof(labels[i]), "[%c] %.26s",
+                 boot_images[i].storage == CARDPUTER_STORAGE_FLASH ? 'F' : 'S',
+                 base_name(boot_images[i].path));
+        items[i] = labels[i];
+        if (boot_images[i].storage == CARDPUTER_STORAGE_FLASH &&
+            strcasecmp(base_name(boot_images[i].path), "cardputer86.img") == 0) {
+            selected = i;
+        }
+    }
+    if (boot_image_count > 1) {
+        selected = choose_menu("Select boot image", items, boot_image_count,
+                               selected, true);
+    }
+
+    const BootImageEntry &entry = boot_images[selected];
+    gb_disk_image = {};
+    gb_disk_image.mounted = true;
+    gb_disk_image.storage = entry.storage;
+    strncpy(gb_disk_image.path, entry.path, sizeof(gb_disk_image.path) - 1);
+    set_disk_geometry(entry.size);
+
+    if (entry.storage == CARDPUTER_STORAGE_FLASH) {
+        unmount_sd();
+        flash_image_file = fopen(gb_disk_image.path, "r+b");
+        gb_disk_image.mounted = flash_image_file != nullptr;
+    } else {
+        unmount_flash();
+        sd_image_file = SD.open(gb_disk_image.path, "r+");
+        gb_disk_image.mounted = (bool)sd_image_file;
+    }
+    return gb_disk_image.mounted;
+}
+
+bool cardputer_storage_init_and_select(void) {
+    gb_disk_image = {};
+    boot_image_count = 0;
+    mount_flash();
+    mount_sd();
+    scan_flash_images();
+    scan_sd_images();
+
+#ifdef use_lib_log_serial
+    Serial.printf("Storage: flash=%d sd=%d images=%u\n",
+                  flash_available, sd_available, boot_image_count);
+#endif
+    return select_boot_image();
+}
+
+bool cardputer_storage_read_sector(unsigned long lba, unsigned char *buffer) {
+    if (!gb_disk_image.mounted || (lba + 1) * 512UL > gb_disk_image.size) return false;
+    if (gb_disk_image.storage == CARDPUTER_STORAGE_FLASH) {
+        return flash_image_file &&
+               fseek(flash_image_file, lba * 512UL, SEEK_SET) == 0 &&
+               fread(buffer, 1, 512, flash_image_file) == 512;
+    }
+    if (gb_disk_image.storage == CARDPUTER_STORAGE_SD) {
+        return sd_image_file && sd_image_file.seek(lba * 512UL) &&
+               sd_image_file.read(buffer, 512) == 512;
+    }
+    return false;
+}
+
+bool cardputer_storage_write_sector(unsigned long lba, const unsigned char *buffer) {
+    if (!gb_disk_image.mounted || (lba + 1) * 512UL > gb_disk_image.size) return false;
+    if (gb_disk_image.storage == CARDPUTER_STORAGE_FLASH) {
+        if (!flash_image_file) return false;
+        bool ok = fseek(flash_image_file, lba * 512UL, SEEK_SET) == 0 &&
+                  fwrite(buffer, 1, 512, flash_image_file) == 512;
+        fflush(flash_image_file);
+        return ok;
+    }
+    if (gb_disk_image.storage == CARDPUTER_STORAGE_SD) {
+        if (!sd_image_file) return false;
+        bool ok = sd_image_file.seek(lba * 512UL) &&
+                  sd_image_file.write(buffer, 512) == 512;
+        sd_image_file.flush();
+        return ok;
+    }
+    return false;
+}
+
+static bool flush_flash_cache(void) {
+    if (!usb_flash_cache_dirty || usb_flash_cache_address == SIZE_MAX) return true;
+    if (wl_erase_range(usb_flash_wl, usb_flash_cache_address,
+                       usb_flash_cache_size) != ESP_OK ||
+        wl_write(usb_flash_wl, usb_flash_cache_address, usb_flash_cache,
+                 usb_flash_cache_size) != ESP_OK) {
+        return false;
+    }
+    usb_flash_cache_dirty = false;
+    return true;
+}
+
+static bool load_flash_cache(size_t address) {
+    const size_t block = address - address % usb_flash_cache_size;
+    if (block == usb_flash_cache_address) return true;
+    if (!flush_flash_cache()) return false;
+    if (wl_read(usb_flash_wl, block, usb_flash_cache,
+                usb_flash_cache_size) != ESP_OK) return false;
+    usb_flash_cache_address = block;
+    return true;
+}
+
+static int32_t usb_read(uint32_t lba, uint32_t offset, void *buffer,
+                        uint32_t size) {
+    uint8_t *destination = static_cast<uint8_t *>(buffer);
+    uint32_t copied = 0;
+    while (copied < size) {
+        const size_t address = (size_t)lba * 512 + offset + copied;
+        uint32_t chunk;
+        if (usb_storage == CARDPUTER_STORAGE_SD) {
+            const uint32_t sector = address / 512;
+            const uint32_t sector_offset = address % 512;
+            chunk = min(size - copied, 512U - sector_offset);
+            if (!SD.readRAW(sd_usb_sector, sector)) return copied ? copied : -1;
+            memcpy(destination + copied, sd_usb_sector + sector_offset, chunk);
+        } else {
+            if (!load_flash_cache(address)) return copied ? copied : -1;
+            const size_t cache_offset = address - usb_flash_cache_address;
+            chunk = min((size_t)(size - copied), usb_flash_cache_size - cache_offset);
+            memcpy(destination + copied, usb_flash_cache + cache_offset, chunk);
+        }
+        copied += chunk;
+    }
+    return copied;
+}
+
+static int32_t usb_write(uint32_t lba, uint32_t offset, uint8_t *buffer,
+                         uint32_t size) {
+    uint32_t copied = 0;
+    while (copied < size) {
+        const size_t address = (size_t)lba * 512 + offset + copied;
+        uint32_t chunk;
+        if (usb_storage == CARDPUTER_STORAGE_SD) {
+            const uint32_t sector = address / 512;
+            const uint32_t sector_offset = address % 512;
+            chunk = min(size - copied, 512U - sector_offset);
+            if ((sector_offset || chunk != 512) &&
+                !SD.readRAW(sd_usb_sector, sector)) return copied ? copied : -1;
+            memcpy(sd_usb_sector + sector_offset, buffer + copied, chunk);
+            if (!SD.writeRAW(sd_usb_sector, sector)) return copied ? copied : -1;
+        } else {
+            if (!load_flash_cache(address)) return copied ? copied : -1;
+            const size_t cache_offset = address - usb_flash_cache_address;
+            chunk = min((size_t)(size - copied), usb_flash_cache_size - cache_offset);
+            memcpy(usb_flash_cache + cache_offset, buffer + copied, chunk);
+            usb_flash_cache_dirty = true;
+        }
+        copied += chunk;
+    }
+    return copied;
+}
+
+static bool usb_start_stop(uint8_t power_condition, bool start, bool load_eject) {
+    (void)power_condition;
+    flush_flash_cache();
+    if (usb_msc) usb_msc->mediaPresent(!load_eject || start);
+    return true;
+}
+
+static bool start_flash_usb(void) {
+    const esp_partition_t *partition = esp_partition_find_first(
+        ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT,
+        FLASH_PARTITION_LABEL);
+    if (!partition || wl_mount(partition, &usb_flash_wl) != ESP_OK) return false;
+    usb_flash_cache_size = wl_sector_size(usb_flash_wl);
+    usb_flash_cache = static_cast<uint8_t *>(malloc(usb_flash_cache_size));
+    if (!usb_flash_cache) {
+        wl_unmount(usb_flash_wl);
+        usb_flash_wl = WL_INVALID_HANDLE;
+        return false;
+    }
+    usb_storage = CARDPUTER_STORAGE_FLASH;
+    return true;
+}
+
+static bool start_usb_msc(CardputerStorageType storage) {
+    uint32_t sector_count = 0;
+    if (storage == CARDPUTER_STORAGE_SD) {
+        usb_storage = CARDPUTER_STORAGE_SD;
+        sector_count = SD.cardSize() / 512;
+    } else {
+        if (!start_flash_usb()) return false;
+        sector_count = wl_size(usb_flash_wl) / 512;
+    }
+
+    usb_msc = new USBMSC();
+    if (!usb_msc) {
+        if (usb_flash_wl != WL_INVALID_HANDLE) {
+            free(usb_flash_cache);
+            usb_flash_cache = nullptr;
+            wl_unmount(usb_flash_wl);
+            usb_flash_wl = WL_INVALID_HANDLE;
+        }
+        return false;
+    }
+    usb_msc->vendorID("M5Stack");
+    usb_msc->productID(storage == CARDPUTER_STORAGE_SD ?
+                       "CardPuter86 SD" : "CardPuter86 Flash");
+    usb_msc->productRevision("1.0");
+    usb_msc->onStartStop(usb_start_stop);
+    usb_msc->onRead(usb_read);
+    usb_msc->onWrite(usb_write);
+    usb_msc->mediaPresent(true);
+    if (!usb_msc->begin(sector_count, 512)) {
+        delete usb_msc;
+        usb_msc = nullptr;
+        if (usb_flash_wl != WL_INVALID_HANDLE) {
+            free(usb_flash_cache);
+            usb_flash_cache = nullptr;
+            wl_unmount(usb_flash_wl);
+            usb_flash_wl = WL_INVALID_HANDLE;
+        }
+        return false;
+    }
+    USB.productName(storage == CARDPUTER_STORAGE_SD ?
+                    "CardPuter86 SD Card" : "CardPuter86 Internal Disk");
+    USB.begin();
+    return true;
+}
+
+bool cardputer_storage_enter_usb_mode_if_requested(void) {
+    const uint32_t detection_deadline = millis() + 300;
+    bool opt_pressed = false;
+    do {
+        M5Cardputer.update();
+        opt_pressed = M5Cardputer.Keyboard.keysState().opt;
+        if (opt_pressed) break;
+        delay(10);
+    } while ((int32_t)(detection_deadline - millis()) > 0);
+    if (!opt_pressed) return false;
+
+    auto &display = M5Cardputer.Display;
+    display.fillScreen(TFT_BLACK);
+    display.setTextColor(TFT_WHITE, TFT_BLACK);
+    display.setTextSize(1);
+    display.setCursor(8, 42);
+    display.print("Hold Opt for USB disk mode");
+    const uint32_t hold_started = millis();
+    while (millis() - hold_started < 3000) {
+        M5Cardputer.update();
+        if (!M5Cardputer.Keyboard.keysState().opt) return false;
+        display.fillRect(8, 66, (millis() - hold_started) * 224 / 3000,
+                         6, TFT_GREEN);
+        delay(10);
+    }
+
+    CardputerStorageType selected = CARDPUTER_STORAGE_FLASH;
+    if (mount_sd()) {
+        const char *items[] = {"Internal Flash", "SD Card"};
+        uint8_t choice = choose_menu("USB storage source", items, 2, 0, false);
+        selected = choice == 0 ? CARDPUTER_STORAGE_FLASH : CARDPUTER_STORAGE_SD;
+        if (selected == CARDPUTER_STORAGE_FLASH) unmount_sd();
+    }
+
+    display.fillScreen(TFT_BLACK);
+    display.setCursor(8, 48);
+    display.setTextColor(TFT_WHITE, TFT_BLACK);
+    display.print("Starting USB storage...");
+    if (!start_usb_msc(selected)) {
+        display.setCursor(8, 68);
+        display.setTextColor(TFT_RED, TFT_BLACK);
+        display.print("USB storage init failed");
+        delay(2000);
+        return false;
+    }
+
+    display.fillScreen(TFT_BLACK);
+    display.setCursor(8, 44);
+    display.setTextColor(TFT_GREEN, TFT_BLACK);
+    display.print(selected == CARDPUTER_STORAGE_SD ?
+                  "SD USB disk active" : "Flash USB disk active");
+    display.setCursor(8, 64);
+    display.setTextColor(TFT_WHITE, TFT_BLACK);
+    display.print("Copy IMG files, then eject");
+    display.setCursor(8, 78);
+    display.print("Reboot after safe eject");
+    while (true) delay(1000);
+}

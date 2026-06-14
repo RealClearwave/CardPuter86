@@ -5,13 +5,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$SCRIPT_DIR/ESP32/CardPuter86"
 PIO_ENV="cardputer86"
 BUILD_ONLY=false
+WITH_IMAGES=false
 
-if [[ "${1:-}" == "--build-only" ]]; then
-    BUILD_ONLY=true
-elif [[ $# -gt 0 ]]; then
-    echo "Usage: $0 [--build-only]"
-    exit 2
-fi
+for arg in "$@"; do
+    case "$arg" in
+        --build-only) BUILD_ONLY=true ;;
+        --with-images) WITH_IMAGES=true ;;
+        *)
+            echo "Usage: $0 [--build-only] [--with-images]"
+            exit 2
+            ;;
+    esac
+done
 
 if command -v pio >/dev/null 2>&1; then
     PIO_BIN="$(command -v pio)"
@@ -34,6 +39,10 @@ echo ""
 # 1. Build
 echo "[BUILD] Compiling..."
 "$PIO_BIN" run --project-dir "$PROJECT_DIR" --environment "$PIO_ENV"
+if [[ "$BUILD_ONLY" == true || "$WITH_IMAGES" == true ]]; then
+    echo "[BUILD] Creating internal disk filesystem..."
+    "$PIO_BIN" run --project-dir "$PROJECT_DIR" --environment "$PIO_ENV" --target buildfs
+fi
 echo ""
 
 FIRMWARE="$PROJECT_DIR/.pio/build/$PIO_ENV/firmware.bin"
@@ -59,12 +68,27 @@ echo "[PORT] $PORT"
 echo ""
 
 # 3. Confirm
+if [[ "$WITH_IMAGES" == true ]]; then
+    echo "[WARNING] --with-images erases the device before reinstalling firmware and the default IMG partition."
+fi
 read -r -p "[WAIT] Press ENTER to flash $PORT, or Ctrl-C to cancel ..." _
 echo ""
 
 # 4. Flash
+if [[ "$WITH_IMAGES" == true ]]; then
+    echo "[FLASH] Erasing old Flash and wear-leveling metadata..."
+    "$PIO_BIN" run --project-dir "$PROJECT_DIR" --environment "$PIO_ENV" \
+        --target erase --upload-port "$PORT"
+fi
 echo "[FLASH] Uploading..."
 "$PIO_BIN" run --project-dir "$PROJECT_DIR" --environment "$PIO_ENV" \
     --target upload --upload-port "$PORT"
+if [[ "$WITH_IMAGES" == true ]]; then
+    echo "[FLASH] Uploading internal disk filesystem..."
+    "$PIO_BIN" run --project-dir "$PROJECT_DIR" --environment "$PIO_ENV" \
+        --target uploadfs --upload-port "$PORT"
+else
+    echo "[KEEP] Internal IMG partition was not changed."
+fi
 echo ""
 echo "[DONE]"

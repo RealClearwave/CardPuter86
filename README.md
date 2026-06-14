@@ -7,7 +7,8 @@ CardPuter86 is an 8086 PC emulator for the M5Stack Cardputer (ESP32-S3), based o
 - M5Stack Cardputer keyboard support
 - ST7789 LCD output with CGA text and graphics modes
 - PC speaker output through the Cardputer I2S speaker
-- Built-in BIOS, BASIC ROM, disk image and COM program support
+- Built-in BIOS, BASIC ROM and COM program support
+- Independent writable IMG storage on internal Flash and microSD
 - PlatformIO build and flash workflow
 
 ## Build
@@ -37,7 +38,13 @@ Connect the Cardputer over USB and run:
 ./flash.sh
 ```
 
-The script builds the project, detects the serial device and asks for confirmation before uploading.
+For the first installation, initialize the internal IMG partition:
+
+```sh
+./flash.sh --with-images
+```
+
+`--with-images` erases the device and reinstalls the default image partition. Normal `./flash.sh` updates only the firmware and preserves imported images.
 
 ## Keyboard
 
@@ -51,11 +58,15 @@ The script builds the project, detects the serial device and asks for confirmati
 
 Fn combinations replace their base keys, so `Fn+1` sends only F1 rather than both `1` and F1.
 
-## SD Card
+## Disk Images
 
-Place a raw DOS disk image in the SD card root. `cardputer86.img` or `cardputer86.dsk` is preferred; otherwise the first `.img`/`.dsk` file is used. Floppy-sized images are mounted as `B:`, while images larger than 2.88 MB are mounted as hard drive `C:`. The image is writable.
+Disk images are regular writable `.img` files stored independently from the firmware. The built-in Flash image partition initially contains `cardputer86.img`. Images in the microSD root are also detected; legacy `.dsk` files remain compatible.
 
-To access the whole SD card from a connected computer, hold `Opt` continuously for at least three seconds while powering on or resetting the Cardputer. CardPuter86 then starts in USB mass-storage mode instead of launching the emulator. Eject the disk on the computer before rebooting the Cardputer.
+When more than one image is available, startup shows a boot menu. Use `W`/`S` (or the printed arrow keys) and `Enter`; keys `1` through `9` select directly. Without input, `cardputer86.img` starts after four seconds. Floppy-sized images boot as `A:`, while images larger than 2.88 MB boot as hard drive `C:`.
+
+To import images from a computer, hold `Opt` continuously for at least three seconds while powering on or resetting. If a microSD card is present, select either `Internal Flash` or `SD Card`; otherwise the internal Flash is exported automatically as a USB drive. Copy `.img` files to its root, safely eject it, and reboot.
+
+`ESP32/CardPuter86/data/cardputer86.img` is used only by `--with-images`. This option resets the internal image partition, so routine firmware updates intentionally do not run `uploadfs`.
 
 ## Documentation
 

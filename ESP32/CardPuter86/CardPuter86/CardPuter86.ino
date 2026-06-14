@@ -29,9 +29,7 @@
 #include "cardputer_display.h"
 #include "cardputer_kbd.h"
 #include "cardputer_speaker.h"
-#ifdef use_lib_sdcard
-#include "cardputer_sd.h"
-#endif
+#include "cardputer_storage.h"
 
 // ===============================================
 // Global variables (defined here, extern in gbGlobals.h)
@@ -87,8 +85,6 @@ unsigned char vidmode = 5;
 unsigned char gb_force_set_cga = 0;
 unsigned char gb_force_load_com = 0;
 unsigned char gb_force_boot = 0;
-unsigned char gb_force_load_dsk = 0;
-unsigned char gb_id_cur_dsk = 0;
 
 unsigned char gb_portramTiny[51];
 void *gb_portTiny_write_callback[5];
@@ -494,28 +490,14 @@ void setup() {
     // Initialize TFT display (draws boot log on screen)
     cardputer_display_init();
 
-#ifdef use_lib_sdcard
-    cardputer_sd_enter_usb_mode_if_requested();
-#endif
+    cardputer_storage_enter_usb_mode_if_requested();
 
     // Continue logging on screen
     tft_log_num("Heap free:", (unsigned long)ESP.getFreeHeap());
     tft_log_num("PSRAM:", (unsigned long)ESP.getPsramSize());
 
-    // Initialize keyboard
-    cardputer_kbd_init();
-    tft_log("Keyboard OK");
-
-    // Initialize I2S speaker
-    cardputer_speaker_init();
-    tft_log("I2S speaker OK");
-
-#ifdef use_lib_sdcard
-    // Initialize SD card
-    cardputer_sd_init();
-#endif
-
-    // Allocate emulator RAM
+    // Reserve the four contiguous emulator RAM banks before filesystems and
+    // drivers fragment the remaining heap.
     if (!CreateRAM()) {
         tft_log("ERROR: emulator RAM allocation failed");
 #ifdef use_lib_log_serial
@@ -531,13 +513,21 @@ void setup() {
     memset(gb_key_before, 1, sizeof(gb_key_before));
     FuerzoParityRAM();
 
-#ifdef use_lib_sdcard
+    // Mount internal Flash/SD storage and select the boot IMG.
+    cardputer_storage_init_and_select();
+    bootdrive = gb_disk_image.mounted ? gb_disk_image.drive : 255;
+
+    // Initialize keyboard
+    cardputer_kbd_init();
+
+    // Initialize I2S speaker
+    cardputer_speaker_init();
+
     // BIOS data area: number of installed hard disks.
-    if (gb_sd_disk.mounted && gb_sd_disk.drive == 0x80) {
+    if (gb_disk_image.mounted && gb_disk_image.drive == 0x80) {
         gb_ram_bank[0][0x475] = 1;
         hdcount = 1;
     }
-#endif
 
     // Initialize emulator
     running = 1;
