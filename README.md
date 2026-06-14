@@ -56,7 +56,7 @@ For the first installation, initialize the internal IMG partition:
 - `Opt`: switch between the default 3x5 text mode and full-screen scaled mode. Text mode displays the complete 80x25 screen at 1:1 without framebuffer scaling.
 - `G0`: reserved
 
-The fixed-cell 3x5 font is adapted from [Font3x5.h](https://github.com/Vean/FansElectronics_DM12ESP/blob/main/fonts/Font3x5.h), licensed under GPL-3.0.
+The 3x5 text font is [Tom Thumb](https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5) by Robey Pointer, released under CC0.
 
 Fn combinations replace their base keys, so `Fn+1` sends only F1 rather than both `1` and F1.
 

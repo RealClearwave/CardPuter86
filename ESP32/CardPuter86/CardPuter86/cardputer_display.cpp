@@ -2,7 +2,7 @@
 #include "gbConfig.h"
 #include "hardware.h"
 #include "gbGlobals.h"
-#include "Font3x5.h"
+#include "TomThumb3x5.h"
 #include <M5Cardputer.h>
 
 // ===============================================
@@ -241,7 +241,7 @@ void tft_blit_scaled(bool emulated_graphics_mode) {
                 }
                 if (character < 32 || character > 127) character = '?';
                 const uint8_t *glyph =
-                    cardputer_font_3x5 + (character - 32) * 3;
+                    tom_thumb_3x5 + (character - 32) * 3;
                 for (int gy = 0; gy < 5; gy++) {
                     const int y = y_offset + row * 5 + gy;
                     for (int gx = 0; gx < 3; gx++) {
