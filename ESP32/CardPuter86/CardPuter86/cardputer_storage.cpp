@@ -162,7 +162,7 @@ static void sd_mount_task(void *parameter) {
     while (true) vTaskDelay(portMAX_DELAY);
 }
 
-static bool mount_sd_cancelable(void) {
+static bool mount_sd_timed(void) {
     sd_mount_finished = false;
     sd_mount_result = false;
     sd_mount_task_handle = nullptr;
@@ -172,25 +172,8 @@ static bool mount_sd_cancelable(void) {
         &sd_mount_task_handle, 0);
     if (created != pdPASS) return false;
 
-    uint32_t opt_pressed_at = 0;
     const uint32_t started_at = millis();
     while (!sd_mount_finished) {
-        M5Cardputer.update();
-        if (M5Cardputer.Keyboard.keysState().opt) {
-            if (opt_pressed_at == 0) opt_pressed_at = millis();
-            if (millis() - opt_pressed_at >= 1200) {
-                if (sd_mount_task_handle) {
-                    vTaskDelete(sd_mount_task_handle);
-                    sd_mount_task_handle = nullptr;
-                }
-                show_probe_status("SD check skipped", "Continuing with internal IMG");
-                delay(250);
-                return false;
-            }
-        } else {
-            opt_pressed_at = 0;
-        }
-
         // A faulty card or bus must not prevent the internal image from booting.
         if (millis() - started_at >= 15000) {
             if (sd_mount_task_handle) {
@@ -208,6 +191,23 @@ static bool mount_sd_cancelable(void) {
     if (sd_mount_task_handle) vTaskDelete(sd_mount_task_handle);
     sd_mount_task_handle = nullptr;
     return result;
+}
+
+static bool alt_requests_sd(void) {
+    show_probe_status("SD disabled by default", "Hold Alt to scan SD (1.5s)");
+    const uint32_t deadline = millis() + 1500;
+    uint32_t alt_pressed_at = 0;
+    while ((int32_t)(deadline - millis()) > 0) {
+        M5Cardputer.update();
+        if (M5Cardputer.Keyboard.keysState().alt) {
+            if (alt_pressed_at == 0) alt_pressed_at = millis();
+            if (millis() - alt_pressed_at >= 200) return true;
+        } else {
+            alt_pressed_at = 0;
+        }
+        delay(10);
+    }
+    return false;
 }
 
 static void unmount_sd(void) {
@@ -473,13 +473,16 @@ bool cardputer_storage_init_and_select(void) {
         scan_flash_images();
         unmount_flash();
     }
-    show_probe_status(flash_detected ? "Internal IMG ready; checking SD..." :
-                                       "Internal IMG failed; checking SD...",
-                      "Hold Opt 1.2s to skip SD");
-    if (mount_sd_cancelable()) {
-        sd_detected = true;
-        scan_sd_images();
-        unmount_sd();
+    if (alt_requests_sd()) {
+        show_probe_status("Alt held; checking SD...", "Timeout: 15 seconds");
+        if (mount_sd_timed()) {
+            sd_detected = true;
+            scan_sd_images();
+            unmount_sd();
+        }
+    } else {
+        show_probe_status("SD skipped", "Using internal IMG only");
+        delay(250);
     }
     show_probe_status("Selecting boot image...");
 
