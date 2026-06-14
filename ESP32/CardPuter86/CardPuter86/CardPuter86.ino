@@ -516,6 +516,7 @@ void setup() {
     // Mount internal Flash/SD storage and select the boot IMG.
     cardputer_storage_init_and_select();
     bootdrive = gb_disk_image.mounted ? gb_disk_image.drive : 255;
+    cardputer_storage_show_boot_status();
 
     // Initialize keyboard
     cardputer_kbd_init();

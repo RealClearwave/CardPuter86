@@ -29,6 +29,8 @@ struct BootImageEntry {
 static SPIClass sd_spi;
 static bool sd_available = false;
 static bool flash_available = false;
+static bool sd_detected = false;
+static bool flash_detected = false;
 static wl_handle_t flash_wl_handle = WL_INVALID_HANDLE;
 static FILE *flash_image_file = nullptr;
 static File sd_image_file;
@@ -43,6 +45,7 @@ static uint8_t *usb_flash_cache = nullptr;
 static size_t usb_flash_cache_address = SIZE_MAX;
 static size_t usb_flash_cache_size = 0;
 static bool usb_flash_cache_dirty = false;
+static uint16_t usb_block_size = 512;
 
 CardputerDiskImage gb_disk_image = {};
 
@@ -119,8 +122,13 @@ static bool mount_flash(void) {
         .max_files = 4,
         .allocation_unit_size = 4096
     };
-    if (esp_vfs_fat_spiflash_mount(FLASH_MOUNT_POINT, FLASH_PARTITION_LABEL,
-                                   &config, &flash_wl_handle) != ESP_OK) {
+    esp_err_t result = esp_vfs_fat_spiflash_mount(
+        FLASH_MOUNT_POINT, FLASH_PARTITION_LABEL, &config, &flash_wl_handle);
+    if (result != ESP_OK) {
+#ifdef use_lib_log_serial
+        Serial.printf("Internal IMG partition mount failed: %s\n",
+                      esp_err_to_name(result));
+#endif
         flash_wl_handle = WL_INVALID_HANDLE;
         return false;
     }
@@ -317,36 +325,112 @@ static bool select_boot_image(void) {
 
     const BootImageEntry &entry = boot_images[selected];
     gb_disk_image = {};
-    gb_disk_image.mounted = true;
     gb_disk_image.storage = entry.storage;
     strncpy(gb_disk_image.path, entry.path, sizeof(gb_disk_image.path) - 1);
     set_disk_geometry(entry.size);
 
     if (entry.storage == CARDPUTER_STORAGE_FLASH) {
-        unmount_sd();
+        if (!mount_flash()) {
+            gb_disk_image = {};
+            return false;
+        }
         flash_image_file = fopen(gb_disk_image.path, "r+b");
         gb_disk_image.mounted = flash_image_file != nullptr;
+        if (!gb_disk_image.mounted) unmount_flash();
     } else {
-        unmount_flash();
+        if (!mount_sd()) {
+            gb_disk_image = {};
+            return false;
+        }
         sd_image_file = SD.open(gb_disk_image.path, "r+");
         gb_disk_image.mounted = (bool)sd_image_file;
+        if (!gb_disk_image.mounted) unmount_sd();
     }
+#ifdef use_lib_log_serial
+    if (gb_disk_image.mounted) {
+        Serial.printf("Boot IMG: source=%s path=%s size=%lu drive=%02X\n",
+                      gb_disk_image.storage == CARDPUTER_STORAGE_FLASH ?
+                      "flash" : "sd", gb_disk_image.path,
+                      (unsigned long)gb_disk_image.size, gb_disk_image.drive);
+    } else {
+        Serial.printf("Boot IMG open failed: %s\n", gb_disk_image.path);
+    }
+#endif
     return gb_disk_image.mounted;
 }
 
 bool cardputer_storage_init_and_select(void) {
     gb_disk_image = {};
     boot_image_count = 0;
-    mount_flash();
-    mount_sd();
-    scan_flash_images();
-    scan_sd_images();
+    flash_detected = false;
+    sd_detected = false;
+
+    // Scan one filesystem at a time. Mounting FFat and SD together after the
+    // emulator RAM reservation can exhaust or fragment the remaining heap.
+    if (mount_flash()) {
+        flash_detected = true;
+        scan_flash_images();
+        unmount_flash();
+    }
+    if (mount_sd()) {
+        sd_detected = true;
+        scan_sd_images();
+        unmount_sd();
+    }
 
 #ifdef use_lib_log_serial
-    Serial.printf("Storage: flash=%d sd=%d images=%u\n",
-                  flash_available, sd_available, boot_image_count);
+    Serial.printf("Storage: images=%u\n", boot_image_count);
 #endif
     return select_boot_image();
+}
+
+void cardputer_storage_show_boot_status(void) {
+    auto &display = M5Cardputer.Display;
+    display.fillScreen(TFT_BLACK);
+    display.fillRect(0, 0, display.width(), 16, TFT_BLUE);
+    display.setTextSize(1);
+    display.setTextColor(TFT_WHITE, TFT_BLUE);
+    display.setCursor(4, 4);
+    display.print("CardPuter86 POST");
+
+    display.setTextColor(flash_detected ? TFT_GREEN : TFT_RED, TFT_BLACK);
+    display.setCursor(6, 24);
+    display.printf("Internal IMG partition: %s",
+                   flash_detected ? "ready" : "unavailable");
+
+    display.setTextColor(sd_detected ? TFT_GREEN : TFT_DARKGREY, TFT_BLACK);
+    display.setCursor(6, 37);
+    display.printf("SD card: %s", sd_detected ? "detected" : "not inserted");
+
+    if (gb_disk_image.mounted) {
+        display.setTextColor(TFT_CYAN, TFT_BLACK);
+        display.setCursor(6, 54);
+        display.printf("Boot source: %s",
+                       gb_disk_image.storage == CARDPUTER_STORAGE_FLASH ?
+                       "Internal Flash" : "SD card");
+        display.setTextColor(TFT_WHITE, TFT_BLACK);
+        display.setCursor(6, 67);
+        display.printf("Image: %.34s", base_name(gb_disk_image.path));
+        display.setCursor(6, 80);
+        display.printf("Size: %lu KB", (unsigned long)(gb_disk_image.size / 1024));
+        display.setCursor(6, 93);
+        display.printf("Emulated drive: %s",
+                       gb_disk_image.drive == 0x80 ? "C: hard disk" : "A: floppy");
+        display.setTextColor(TFT_GREEN, TFT_BLACK);
+        display.setCursor(6, 112);
+        display.print("Boot image ready");
+        delay(1200);
+    } else {
+        display.setTextColor(TFT_RED, TFT_BLACK);
+        display.setCursor(6, 58);
+        display.print("No bootable IMG found");
+        display.setTextColor(TFT_WHITE, TFT_BLACK);
+        display.setCursor(6, 76);
+        display.print("Hold Opt for 3s at startup");
+        display.setCursor(6, 89);
+        display.print("to import an IMG over USB");
+        delay(2500);
+    }
 }
 
 bool cardputer_storage_read_sector(unsigned long lba, unsigned char *buffer) {
@@ -409,7 +493,7 @@ static int32_t usb_read(uint32_t lba, uint32_t offset, void *buffer,
     uint8_t *destination = static_cast<uint8_t *>(buffer);
     uint32_t copied = 0;
     while (copied < size) {
-        const size_t address = (size_t)lba * 512 + offset + copied;
+        const size_t address = (size_t)lba * usb_block_size + offset + copied;
         uint32_t chunk;
         if (usb_storage == CARDPUTER_STORAGE_SD) {
             const uint32_t sector = address / 512;
@@ -432,7 +516,7 @@ static int32_t usb_write(uint32_t lba, uint32_t offset, uint8_t *buffer,
                          uint32_t size) {
     uint32_t copied = 0;
     while (copied < size) {
-        const size_t address = (size_t)lba * 512 + offset + copied;
+        const size_t address = (size_t)lba * usb_block_size + offset + copied;
         uint32_t chunk;
         if (usb_storage == CARDPUTER_STORAGE_SD) {
             const uint32_t sector = address / 512;
@@ -481,11 +565,18 @@ static bool start_usb_msc(CardputerStorageType storage) {
     uint32_t sector_count = 0;
     if (storage == CARDPUTER_STORAGE_SD) {
         usb_storage = CARDPUTER_STORAGE_SD;
+        usb_block_size = 512;
         sector_count = SD.cardSize() / 512;
     } else {
         if (!start_flash_usb()) return false;
-        sector_count = wl_size(usb_flash_wl) / 512;
+        usb_block_size = usb_flash_cache_size;
+        sector_count = wl_size(usb_flash_wl) / usb_block_size;
     }
+#ifdef use_lib_log_serial
+    Serial.printf("USB MSC: source=%s blocks=%lu block_size=%u\n",
+                  storage == CARDPUTER_STORAGE_SD ? "sd" : "flash",
+                  (unsigned long)sector_count, usb_block_size);
+#endif
 
     usb_msc = new USBMSC();
     if (!usb_msc) {
@@ -505,7 +596,7 @@ static bool start_usb_msc(CardputerStorageType storage) {
     usb_msc->onRead(usb_read);
     usb_msc->onWrite(usb_write);
     usb_msc->mediaPresent(true);
-    if (!usb_msc->begin(sector_count, 512)) {
+    if (!usb_msc->begin(sector_count, usb_block_size)) {
         delete usb_msc;
         usb_msc = nullptr;
         if (usb_flash_wl != WL_INVALID_HANDLE) {

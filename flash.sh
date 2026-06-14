@@ -68,6 +68,22 @@ echo "[PORT] $PORT"
 echo ""
 
 # 3. Confirm
+PARTITIONS="$PROJECT_DIR/.pio/build/$PIO_ENV/partitions.bin"
+if [[ "$WITH_IMAGES" == false && -f "$PARTITIONS" ]]; then
+    ESPTOOL="$(find "$HOME/.platformio/packages/tool-esptoolpy" -maxdepth 1 -type f -name 'esptool.py' | head -n 1 || true)"
+    CURRENT_PARTITIONS="$(mktemp /tmp/cardputer86-partitions.XXXXXX)"
+    if [[ -n "$ESPTOOL" ]] && python3 "$ESPTOOL" --chip esp32s3 --port "$PORT" \
+        read_flash 0x8000 0xC00 "$CURRENT_PARTITIONS" >/dev/null 2>&1; then
+        if ! cmp -s "$CURRENT_PARTITIONS" "$PARTITIONS"; then
+            WITH_IMAGES=true
+            echo "[MIGRATE] Old partition layout detected; the default IMG partition will be installed."
+            echo "[BUILD] Creating internal disk filesystem for migration..."
+            "$PIO_BIN" run --project-dir "$PROJECT_DIR" --environment "$PIO_ENV" --target buildfs
+        fi
+    fi
+    rm -f "$CURRENT_PARTITIONS"
+    sleep 1
+fi
 if [[ "$WITH_IMAGES" == true ]]; then
     echo "[WARNING] --with-images erases the device before reinstalling firmware and the default IMG partition."
 fi

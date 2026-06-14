@@ -26,6 +26,7 @@ extern CardputerDiskImage gb_disk_image;
 
 bool cardputer_storage_enter_usb_mode_if_requested(void);
 bool cardputer_storage_init_and_select(void);
+void cardputer_storage_show_boot_status(void);
 bool cardputer_storage_read_sector(unsigned long lba, unsigned char *buffer);
 bool cardputer_storage_write_sector(unsigned long lba, const unsigned char *buffer);
 
