@@ -64,7 +64,7 @@ Disk images are regular writable `.img` files stored independently from the firm
 
 When more than one image is available, startup shows a boot menu. Use `W`/`S` (or the printed arrow keys) and `Enter`; keys `1` through `9` select directly. Without input, `cardputer86.img` starts after four seconds. Floppy-sized images boot as `A:`, while images larger than 2.88 MB boot as hard drive `C:`.
 
-To import images from a computer, hold `Opt` continuously for at least three seconds while powering on or resetting. If a microSD card is present, select either `Internal Flash` or `SD Card`; otherwise the internal Flash is exported automatically as a USB drive. Copy `.img` files to its root, safely eject it, and reboot.
+To import images from a computer, wait for the optional SD check and hold `Ctrl` when it finishes. If SD was enabled with `Alt` and detected, select either `Internal Flash` or `SD Card`; otherwise the internal Flash is exported automatically as a USB drive. Copy `.img` files to its root, safely eject it, and reboot.
 
 `ESP32/CardPuter86/data/cardputer86.img` is used only by `--with-images`. This option resets the internal image partition, so routine firmware updates intentionally do not run `uploadfs`.
 

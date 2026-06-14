@@ -27,7 +27,7 @@ The regular Cardputer keys map to the corresponding PC keys. The Aa key maps to 
 
 Writable `.img` files live in an independent FAT partition in internal Flash or in the microSD root. If multiple images exist, a startup menu selects the boot image; `cardputer86.img` is the timed default. Legacy `.dsk` files are also accepted.
 
-Hold `Opt` for three seconds during startup to enter USB storage mode. With a microSD card inserted, choose internal Flash or SD; without one, internal Flash is exported automatically. Copy IMG files, safely eject the drive, and reboot.
+After the optional SD check, hold `Ctrl` to enter USB storage mode. If SD was enabled with `Alt` and detected, choose internal Flash or SD; otherwise internal Flash is exported automatically. Copy IMG files, safely eject the drive, and reboot.
 
 ## Embedded software
 

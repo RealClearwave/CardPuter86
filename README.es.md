@@ -27,7 +27,7 @@ Las teclas normales del Cardputer corresponden a las teclas del PC. La tecla Aa 
 
 Los archivos `.img` grabables se guardan en una particion FAT independiente de la Flash interna o en la raiz de la microSD. Si hay varias imagenes, un menu de inicio permite elegir cual arrancar. Tambien se aceptan archivos `.dsk` antiguos.
 
-Mantenga pulsado `Opt` durante tres segundos al arrancar para entrar en modo USB. Si hay microSD, elija Flash interna o SD; sin tarjeta se exporta automaticamente la Flash interna. Copie los IMG, expulse la unidad de forma segura y reinicie.
+Después de la comprobación opcional de SD, mantenga pulsado `Ctrl` para entrar en modo USB. Si la SD se activó con `Alt` y fue detectada, elija Flash interna o SD; de lo contrario se exporta la Flash interna. Copie los IMG, expulse la unidad de forma segura y reinicie.
 
 ## Software integrado
 

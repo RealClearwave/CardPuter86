@@ -539,7 +539,7 @@ void cardputer_storage_show_boot_status(void) {
         display.print("No bootable IMG found");
         display.setTextColor(TFT_WHITE, TFT_BLACK);
         display.setCursor(6, 76);
-        display.print("Hold Opt for 3s at startup");
+        display.print("Hold Ctrl after SD check");
         display.setCursor(6, 89);
         display.print("to import an IMG over USB");
         delay(2500);
@@ -717,29 +717,22 @@ static bool start_usb_msc(CardputerStorageType storage) {
 
 bool cardputer_storage_enter_usb_mode_if_requested(void) {
     const uint32_t detection_deadline = millis() + 300;
-    bool opt_pressed = false;
+    bool ctrl_pressed = false;
     do {
         M5Cardputer.update();
-        opt_pressed = M5Cardputer.Keyboard.keysState().opt;
-        if (opt_pressed) break;
+        ctrl_pressed = M5Cardputer.Keyboard.keysState().ctrl;
+        if (ctrl_pressed) break;
         delay(10);
     } while ((int32_t)(detection_deadline - millis()) > 0);
-    if (!opt_pressed) return false;
+    if (!ctrl_pressed) return false;
 
     auto &display = M5Cardputer.Display;
     display.fillScreen(TFT_BLACK);
     display.setTextColor(TFT_WHITE, TFT_BLACK);
     display.setTextSize(1);
     display.setCursor(8, 42);
-    display.print("Hold Opt for USB disk mode");
-    const uint32_t hold_started = millis();
-    while (millis() - hold_started < 3000) {
-        M5Cardputer.update();
-        if (!M5Cardputer.Keyboard.keysState().opt) return false;
-        display.fillRect(8, 66, (millis() - hold_started) * 224 / 3000,
-                         6, TFT_GREEN);
-        delay(10);
-    }
+    display.print("Ctrl pressed: USB disk mode");
+    delay(250);
 
     CardputerStorageType selected = CARDPUTER_STORAGE_FLASH;
     if (sd_detected && mount_sd_timed()) {
