@@ -48,10 +48,13 @@ static size_t usb_flash_cache_address = SIZE_MAX;
 static size_t usb_flash_cache_size = 0;
 static bool usb_flash_cache_dirty = false;
 static uint16_t usb_block_size = 512;
+static volatile bool sd_mount_finished = false;
+static volatile bool sd_mount_result = false;
+static TaskHandle_t sd_mount_task_handle = nullptr;
 
 CardputerDiskImage gb_disk_image = {};
 
-static void show_probe_status(const char *status) {
+static void show_probe_status(const char *status, const char *hint = nullptr) {
     auto &display = M5Cardputer.Display;
     display.fillScreen(TFT_BLACK);
     display.fillRect(0, 0, display.width(), 16, TFT_BLUE);
@@ -62,6 +65,11 @@ static void show_probe_status(const char *status) {
     display.setTextColor(TFT_WHITE, TFT_BLACK);
     display.setCursor(6, 30);
     display.print(status);
+    if (hint) {
+        display.setTextColor(TFT_YELLOW, TFT_BLACK);
+        display.setCursor(6, 48);
+        display.print(hint);
+    }
 }
 
 static bool is_image_name(const char *name) {
@@ -143,6 +151,63 @@ static bool mount_sd(void) {
     }
     sd_available = true;
     return true;
+}
+
+static void sd_mount_task(void *parameter) {
+    (void)parameter;
+    sd_mount_result = mount_sd();
+    sd_mount_finished = true;
+    // Keep the handle valid until the caller observes the result and deletes
+    // this task. This also removes the completion/cancellation race.
+    while (true) vTaskDelay(portMAX_DELAY);
+}
+
+static bool mount_sd_cancelable(void) {
+    sd_mount_finished = false;
+    sd_mount_result = false;
+    sd_mount_task_handle = nullptr;
+
+    BaseType_t created = xTaskCreatePinnedToCore(
+        sd_mount_task, "sd_mount", 4096, nullptr, 1,
+        &sd_mount_task_handle, 0);
+    if (created != pdPASS) return false;
+
+    uint32_t opt_pressed_at = 0;
+    const uint32_t started_at = millis();
+    while (!sd_mount_finished) {
+        M5Cardputer.update();
+        if (M5Cardputer.Keyboard.keysState().opt) {
+            if (opt_pressed_at == 0) opt_pressed_at = millis();
+            if (millis() - opt_pressed_at >= 1200) {
+                if (sd_mount_task_handle) {
+                    vTaskDelete(sd_mount_task_handle);
+                    sd_mount_task_handle = nullptr;
+                }
+                show_probe_status("SD check skipped", "Continuing with internal IMG");
+                delay(250);
+                return false;
+            }
+        } else {
+            opt_pressed_at = 0;
+        }
+
+        // A faulty card or bus must not prevent the internal image from booting.
+        if (millis() - started_at >= 15000) {
+            if (sd_mount_task_handle) {
+                vTaskDelete(sd_mount_task_handle);
+                sd_mount_task_handle = nullptr;
+            }
+            show_probe_status("SD check timed out", "Continuing with internal IMG");
+            delay(250);
+            return false;
+        }
+        delay(10);
+    }
+
+    const bool result = sd_mount_result;
+    if (sd_mount_task_handle) vTaskDelete(sd_mount_task_handle);
+    sd_mount_task_handle = nullptr;
+    return result;
 }
 
 static void unmount_sd(void) {
@@ -409,8 +474,9 @@ bool cardputer_storage_init_and_select(void) {
         unmount_flash();
     }
     show_probe_status(flash_detected ? "Internal IMG ready; checking SD..." :
-                                       "Internal IMG failed; checking SD...");
-    if (mount_sd()) {
+                                       "Internal IMG failed; checking SD...",
+                      "Hold Opt 1.2s to skip SD");
+    if (mount_sd_cancelable()) {
         sd_detected = true;
         scan_sd_images();
         unmount_sd();
