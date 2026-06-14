@@ -30,6 +30,7 @@
 #include "cardputer_kbd.h"
 #include "cardputer_speaker.h"
 #include "cardputer_storage.h"
+#include "cardputer_cpu.h"
 #include "guest_memory.h"
 
 // ===============================================
@@ -473,6 +474,8 @@ void setup() {
         ? "512 KB guest RAM ready"
         : "128 KB guest RAM ready");
 
+    cardputer_cpu_init();
+
     // Probe storage, show Settings when Ctrl is pressed, then select the IMG.
     // Settings may change the effective guest RAM size for this boot.
     cardputer_storage_init_and_select();
@@ -526,7 +529,8 @@ unsigned int tiene_que_tardar = 0;
 
 void loop() {
     jj_ini_cpu = micros();
-    exec86(10000);
+    static const uint32_t cpu_batch_instructions = 2000;
+    exec86(cpu_batch_instructions);
     jj_end_cpu = micros();
     gb_cur_cpu_ticks = (jj_end_cpu - jj_ini_cpu);
     total_tiempo_ms_cpu = gb_cur_cpu_ticks / 1000;
@@ -534,6 +538,7 @@ void loop() {
         gb_max_cpu_ticks = gb_cur_cpu_ticks;
     if (gb_cur_cpu_ticks < gb_min_cpu_ticks)
         gb_min_cpu_ticks = gb_cur_cpu_ticks;
+    cardputer_cpu_throttle(cpu_batch_instructions);
 
     // Scan keyboard on schedule
     gb_keyboard_time_cur = millis();
@@ -561,17 +566,6 @@ void loop() {
         // Speaker timer callback
         my_callback_speaker_func();
         gb_ini_vga = gb_cur_vga;
-    }
-
-    // CPU timing control
-    if (gb_cpunoexe == 0) {
-        gb_cpunoexe = 1;
-        gb_cpunoexe_timer_ini = millis();
-        tiene_que_tardar = gb_delay_tick_cpu_milis;
-    } else {
-        if ((millis() - gb_cpunoexe_timer_ini) >= tiene_que_tardar) {
-            gb_cpunoexe = 0;
-        }
     }
 
     // Periodic debug output

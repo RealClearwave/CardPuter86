@@ -33,7 +33,7 @@ The M5Burner cover is provided as [SVG](preview/cardputer86-cover.svg) and [PNG]
 
 ## Controls
 
-The regular Cardputer keys map to the corresponding PC keys. The Aa key maps to Shift, while Ctrl and Alt act as PC modifiers. Fn is the CardPuter86 function layer: Fn+1 through Fn+0 send F1-F10, Fn+- sends F11, and Fn+= sends F12. In the default DSx86-style text mode, Fn+;, Fn+., Fn+,, and Fn+/ scroll the 40x16 viewport up, down, left, and right. Manual scrolling selects FIXED mode; Fn+' returns a FIXED viewport to its top-left starting position, while Fn+Space restores AUTO mode. AUTO follows the last content line while keeping up to two detected bottom status rows pinned. Opt switches between this readable 6x8-cell text mode and scaled mode. Scaled mode uses a 3x5 font for text screens and scales graphics screens to the full LCD. G0 is reserved.
+The regular Cardputer keys map to the corresponding PC keys. The Aa key maps to Shift, while Ctrl and Alt act as PC modifiers. Fn is the CardPuter86 function layer: Fn+1 through Fn+0 send F1-F10, Fn+- sends F11, Fn+= sends F12, Fn+` sends Esc, and Fn+Backspace sends Delete. In the default DSx86-style text mode, Fn+;, Fn+., Fn+,, and Fn+/ scroll the 40x16 viewport up, down, left, and right. Manual scrolling selects FIXED mode; Fn+' returns a FIXED viewport to its top-left starting position, while Fn+Space restores AUTO mode. AUTO follows the last content line while keeping up to two detected bottom status rows pinned. Opt switches between this readable 6x8-cell text mode and scaled mode. Scaled mode uses a 3x5 font for text screens and scales graphics screens to the full LCD. G0 is reserved.
 
 The default text view uses the BSD-licensed [Adafruit Classic 5x7 glyphs](https://github.com/adafruit/Adafruit-GFX-Library/blob/master/glcdfont.c) in 6x8 cells. The scaled text view uses [Tom Thumb](https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5) by Robey Pointer, released under CC0.
 
@@ -44,6 +44,8 @@ Writable `.img` files live in an independent FAT partition in internal Flash or 
 After the optional SD check, hold `Ctrl` to enter USB storage mode. If SD was enabled with `Alt` and detected, choose internal Flash or SD; otherwise internal Flash is exported automatically. Copy IMG files, safely eject the drive, and reboot.
 
 Press `Ctrl` after the SD check to open POST Settings. USB disk mode applies only to the current boot. The 512 KB memory option is stored in NVS across power cycles; when disabled, the emulated PC uses 128 KB. In 512 KB mode, active 4 KB pages use a 128 KB SRAM cache and cold dirty pages use a dedicated wear-levelled Flash partition.
+
+Settings also stores an approximate 8086 CPU speed profile: 4.77 MHz, 8 MHz, 10 MHz, 12 MHz, or Unlimited. Limited profiles use an average four-clock-per-instruction timing model, so exact speed varies with the instruction mix.
 
 ## Embedded software
 

@@ -33,7 +33,7 @@ La portada de M5Burner esta disponible como [SVG](preview/cardputer86-cover.svg)
 
 ## Controles
 
-Las teclas normales del Cardputer corresponden a las teclas del PC. La tecla Aa corresponde a Shift, mientras que Ctrl y Alt funcionan como modificadores. Fn es la capa de funciones de CardPuter86: Fn+1 hasta Fn+0 envían F1-F10, Fn+- envía F11 y Fn+= envía F12. En el modo de texto predeterminado al estilo DSx86, Fn+;, Fn+., Fn+, y Fn+/ desplazan la vista 40x16 hacia arriba, abajo, izquierda y derecha. El desplazamiento manual activa el modo FIXED; Fn+' devuelve una vista FIXED a su posición inicial superior izquierda y Fn+Espacio restaura AUTO. AUTO sigue la última línea de contenido y mantiene fijadas hasta dos líneas de estado detectadas al pie. Opt cambia entre este modo de texto legible con celdas 6x8 y el modo escalado. El modo escalado usa una fuente 3x5 para las pantallas de texto y escala las pantallas gráficas a toda la LCD. G0 queda reservado.
+Las teclas normales del Cardputer corresponden a las teclas del PC. La tecla Aa corresponde a Shift, mientras que Ctrl y Alt funcionan como modificadores. Fn es la capa de funciones de CardPuter86: Fn+1 hasta Fn+0 envían F1-F10, Fn+- envía F11, Fn+= envía F12, Fn+` envía Esc y Fn+Retroceso envía Delete. En el modo de texto predeterminado al estilo DSx86, Fn+;, Fn+., Fn+, y Fn+/ desplazan la vista 40x16 hacia arriba, abajo, izquierda y derecha. El desplazamiento manual activa el modo FIXED; Fn+' devuelve una vista FIXED a su posición inicial superior izquierda y Fn+Espacio restaura AUTO. AUTO sigue la última línea de contenido y mantiene fijadas hasta dos líneas de estado detectadas al pie. Opt cambia entre este modo de texto legible con celdas 6x8 y el modo escalado. El modo escalado usa una fuente 3x5 para las pantallas de texto y escala las pantallas gráficas a toda la LCD. G0 queda reservado.
 
 La vista de texto predeterminada usa los [glifos Adafruit Classic 5x7](https://github.com/adafruit/Adafruit-GFX-Library/blob/master/glcdfont.c) con licencia BSD en celdas 6x8. La vista de texto escalada usa [Tom Thumb](https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5) de Robey Pointer, publicada bajo CC0.
 
@@ -44,6 +44,8 @@ Los archivos `.img` grabables se guardan en una particion FAT independiente de l
 Después de la comprobación opcional de SD, mantenga pulsado `Ctrl` para entrar en modo USB. Si la SD se activó con `Alt` y fue detectada, elija Flash interna o SD; de lo contrario se exporta la Flash interna. Copie los IMG, expulse la unidad de forma segura y reinicie.
 
 Pulse `Ctrl` después de la comprobación SD para abrir Settings. El modo USB sólo se aplica al arranque actual. La opción de memoria de 512 KB se guarda en NVS y persiste tras apagar; desactivada, el PC emulado usa 128 KB. En modo 512 KB, las páginas activas usan una caché SRAM de 128 KB y las páginas frías una partición Flash con wear levelling.
+
+Settings también guarda un perfil aproximado de velocidad 8086: 4.77 MHz, 8 MHz, 10 MHz, 12 MHz o Unlimited. Los perfiles limitados suponen una media de cuatro ciclos por instrucción, por lo que la velocidad exacta depende del código ejecutado.
 
 ## Software integrado
 

@@ -105,7 +105,8 @@ void cardputer_kbd_fill_keymap(void) {
         if (sc) keymap[sc] = 0;
     }
 
-    // CardPuter86 function layer: Fn+1..0,-,= maps to F1..F12.
+    // CardPuter86 function layer: Fn+1..0,-,= maps to F1..F12,
+    // Fn+` maps to Esc, and Fn+Backspace maps to Delete.
     if (s.fn) {
         static const char layer_keys[] = "1234567890-=";
         static const uint8_t base_scancodes[] = {
@@ -123,6 +124,15 @@ void cardputer_kbd_fill_keymap(void) {
                 keymap[base_scancodes[i]] = 1;
                 keymap[function_scancodes[i]] = 0;
             }
+        }
+
+        if (M5Cardputer.Keyboard.isKeyPressed('`')) {
+            keymap[PS2_KC_SINGLE] = 1;
+            keymap[PS2_KC_ESC] = 0;
+        }
+        if (s.del) {
+            keymap[PS2_KC_BS] = 1;
+            keymap[PS2_KC_DELETE] = 0;
         }
 
         // The text viewport reserves Fn+; , . / for scrolling, Fn+' for the

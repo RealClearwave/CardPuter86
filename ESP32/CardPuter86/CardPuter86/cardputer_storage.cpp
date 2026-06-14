@@ -1,6 +1,7 @@
 #include "cardputer_storage.h"
 #include "hardware.h"
 #include "guest_memory.h"
+#include "cardputer_cpu.h"
 #include <Arduino.h>
 #include <M5Cardputer.h>
 #include <SD.h>
@@ -322,6 +323,15 @@ static void draw_menu(const char *title, const char *const *items, uint8_t count
 
 static uint8_t choose_menu(const char *title, const char *const *items,
                            uint8_t count, uint8_t selected, bool timeout) {
+    // Do not carry Ctrl/Enter/navigation keys from the previous screen into
+    // this menu. A held Enter used to select item 0 (USB disk mode) when a
+    // Settings submenu returned to its parent.
+    do {
+        M5Cardputer.update();
+        if (!M5Cardputer.Keyboard.isPressed()) break;
+        delay(10);
+    } while (true);
+
     bool previous_up = false;
     bool previous_down = false;
     bool previous_enter = false;
@@ -521,23 +531,28 @@ void cardputer_storage_show_boot_status(void) {
     display.printf("Guest RAM: %s",
                    guest_memory_512k_enabled() ? "512 KB" : "128 KB");
 
+    display.setTextColor(TFT_CYAN, TFT_BLACK);
+    display.setCursor(6, 63);
+    display.printf("CPU speed: %s",
+                   cardputer_cpu_profile_label(cardputer_cpu_profile()));
+
     if (gb_disk_image.mounted) {
         display.setTextColor(TFT_CYAN, TFT_BLACK);
-        display.setCursor(6, 63);
+        display.setCursor(6, 76);
         display.printf("Boot source: %s",
                        gb_disk_image.storage == CARDPUTER_STORAGE_FLASH ?
                        "Internal Flash" : "SD card");
         display.setTextColor(TFT_WHITE, TFT_BLACK);
-        display.setCursor(6, 76);
-        display.printf("Image: %.34s", base_name(gb_disk_image.path));
         display.setCursor(6, 89);
-        display.printf("Size: %lu KB", (unsigned long)(gb_disk_image.size / 1024));
+        display.printf("Image: %.34s", base_name(gb_disk_image.path));
         display.setCursor(6, 102);
+        display.printf("Size: %lu KB", (unsigned long)(gb_disk_image.size / 1024));
+        display.setCursor(6, 115);
         display.printf("Emulated drive: %s",
                        gb_disk_image.drive == 0x80 ? "C: hard disk" : "A: floppy");
         display.setTextColor(TFT_GREEN, TFT_BLACK);
-        display.setCursor(6, 122);
-        display.print("Boot image ready");
+        display.setCursor(150, 125);
+        display.print("Ready");
         delay(1200);
     } else {
         display.setTextColor(TFT_RED, TFT_BLACK);
@@ -770,16 +785,34 @@ bool cardputer_storage_enter_usb_mode_if_requested(void) {
 
     while (true) {
         char ram_item[32];
+        char cpu_item[32];
         snprintf(ram_item, sizeof(ram_item), "512 KB memory: %s",
                  guest_memory_512k_enabled() ? "Enabled" : "Disabled");
-        const char *items[] = {"USB disk mode", ram_item, "Continue boot"};
+        snprintf(cpu_item, sizeof(cpu_item), "CPU speed: %s",
+                 cardputer_cpu_profile_label(cardputer_cpu_profile()));
+        const char *items[] = {
+            "USB disk mode", ram_item, cpu_item, "Continue boot"
+        };
         const uint8_t choice = choose_menu(
-            "CardPuter86 Settings", items, 3, 0, false);
+            "CardPuter86 Settings", items, 4, 0, false);
         if (choice == 0) return start_selected_usb_mode();
         if (choice == 1) {
             const bool enable = !guest_memory_512k_enabled();
             if (!guest_memory_set_512k_enabled(enable)) {
                 show_probe_status("512 KB mode failed", "Swap partition unavailable");
+                delay(1500);
+            }
+            continue;
+        }
+        if (choice == 2) {
+            const char *cpu_profiles[] = {
+                "4.77 MHz (IBM PC)", "8 MHz", "10 MHz", "12 MHz", "Unlimited"
+            };
+            const uint8_t profile = choose_menu(
+                "CPU speed", cpu_profiles, cardputer_cpu_profile_count(),
+                cardputer_cpu_profile(), false);
+            if (!cardputer_cpu_set_profile(profile)) {
+                show_probe_status("CPU setting failed", "NVS write error");
                 delay(1500);
             }
             continue;
