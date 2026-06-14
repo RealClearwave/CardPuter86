@@ -52,3 +52,7 @@ ROM and COM data compiled into the firmware is stored under `ESP32/CardPuter86/C
 ## Upstream
 
 CardPuter86 preserves the Fake86 emulator core and credits Mike Chambers for Fake86 and Ackerman for ESP32TinyFake86.
+
+## License
+
+CardPuter86 is distributed under the [GNU General Public License v3.0 or later](LICENSE). Third-party BSD, CC0, and LGPL components retain their original notices and terms.

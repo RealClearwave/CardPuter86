@@ -106,3 +106,7 @@ Press `Ctrl` after the SD check to open POST Settings. USB disk mode applies onl
 ## Credits
 
 CardPuter86 uses the Fake86 emulator by Mike Chambers and is derived from the ESP32TinyFake86 project by Ackerman. Original project material remains under its respective license and attribution.
+
+## License
+
+CardPuter86 is distributed under the [GNU General Public License v3.0 or later](LICENSE). Third-party components under compatible licenses, including BSD, CC0, and LGPL code and assets, retain their original notices and terms.

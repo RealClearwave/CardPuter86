@@ -52,3 +52,7 @@ Los datos ROM y programas COM se encuentran en `ESP32/CardPuter86/CardPuter86/da
 ## Proyecto original
 
 CardPuter86 conserva el núcleo Fake86 y reconoce el trabajo de Mike Chambers en Fake86 y de Ackerman en ESP32TinyFake86.
+
+## Licencia
+
+CardPuter86 se distribuye bajo la [GNU General Public License v3.0 o posterior](LICENSE). Los componentes de terceros bajo BSD, CC0 y LGPL conservan sus avisos y condiciones originales.
