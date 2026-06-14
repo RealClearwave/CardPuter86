@@ -21,7 +21,9 @@ Para la primera instalacion, cargue el firmware e inicialice la particion IMG in
 
 ## Controles
 
-Las teclas normales del Cardputer corresponden a las teclas del PC. La tecla Aa corresponde a Shift, mientras que Ctrl y Alt funcionan como modificadores. Fn es la capa de funciones de CardPuter86: Fn+1 hasta Fn+0 envían F1-F10, Fn+- envía F11 y Fn+= envía F12. Opt cambia entre texto 1:1 y gráficos escalados a pantalla completa. El texto largo se ajusta sin reducirse y la vista sigue la parte inferior del contenido. G0 queda reservado.
+Las teclas normales del Cardputer corresponden a las teclas del PC. La tecla Aa corresponde a Shift, mientras que Ctrl y Alt funcionan como modificadores. Fn es la capa de funciones de CardPuter86: Fn+1 hasta Fn+0 envían F1-F10, Fn+- envía F11 y Fn+= envía F12. Opt cambia entre el modo de texto 3x5 y el modo escalado a pantalla completa. El modo texto muestra toda la pantalla 80x25 a escala 1:1. G0 queda reservado.
+
+La fuente 3x5 de celda fija está adaptada de [Font3x5.h](https://github.com/Vean/FansElectronics_DM12ESP/blob/main/fonts/Font3x5.h), con licencia GPL-3.0.
 
 ## Imagenes de disco
 

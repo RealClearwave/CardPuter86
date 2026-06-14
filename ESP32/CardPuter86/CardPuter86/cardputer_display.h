@@ -15,7 +15,7 @@ extern unsigned char *gb_frame_buffer;
 extern LGFX_Sprite *gb_tft_sprite;
 
 void cardputer_display_init(void);
-void tft_blit_scaled(bool graphics_mode);
+void tft_blit_scaled(bool emulated_graphics_mode);
 void init_tft_palette(void);
 void cardputer_display_clear(unsigned char color_index);
 void cardputer_update(void);
