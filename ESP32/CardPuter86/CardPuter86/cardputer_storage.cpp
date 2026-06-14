@@ -78,6 +78,9 @@ static const char *base_name(const char *path) {
 }
 
 static bool sd_card_responds(void) {
+    // Cardputer has no card-detect switch. Keep MISO high when the socket is
+    // empty; otherwise a floating line can look like CMD0's 0x01 response.
+    pinMode(SD_MISO, INPUT_PULLUP);
     sd_spi.begin(SD_CLK, SD_MISO, SD_MOSI, SD_CS);
     pinMode(SD_CS, OUTPUT);
     digitalWrite(SD_CS, HIGH);
@@ -85,26 +88,43 @@ static bool sd_card_responds(void) {
     sd_spi.beginTransaction(SPISettings(400000, MSBFIRST, SPI_MODE0));
     for (uint8_t i = 0; i < 10; i++) sd_spi.transfer(0xFF);
 
-    const uint32_t deadline = millis() + 150;
+    digitalWrite(SD_CS, LOW);
+    sd_spi.transfer(0x40); // CMD0
+    sd_spi.transfer(0x00);
+    sd_spi.transfer(0x00);
+    sd_spi.transfer(0x00);
+    sd_spi.transfer(0x00);
+    sd_spi.transfer(0x95);
+    uint8_t cmd0_response = 0xFF;
+    for (uint8_t i = 0; i < 10; i++) {
+        cmd0_response = sd_spi.transfer(0xFF);
+        if ((cmd0_response & 0x80) == 0) break;
+    }
+    digitalWrite(SD_CS, HIGH);
+    sd_spi.transfer(0xFF);
+
     bool detected = false;
-    do {
+    if (cmd0_response == 0x01) {
         digitalWrite(SD_CS, LOW);
-        sd_spi.transfer(0x40);
+        sd_spi.transfer(0x48); // CMD8: SEND_IF_COND
         sd_spi.transfer(0x00);
         sd_spi.transfer(0x00);
-        sd_spi.transfer(0x00);
-        sd_spi.transfer(0x00);
-        sd_spi.transfer(0x95);
+        sd_spi.transfer(0x01);
+        sd_spi.transfer(0xAA);
+        sd_spi.transfer(0x87);
+        uint8_t cmd8_response = 0xFF;
         for (uint8_t i = 0; i < 10; i++) {
-            if (sd_spi.transfer(0xFF) == 0x01) {
-                detected = true;
-                break;
-            }
+            cmd8_response = sd_spi.transfer(0xFF);
+            if ((cmd8_response & 0x80) == 0) break;
+        }
+        uint8_t r7[4] = {0xFF, 0xFF, 0xFF, 0xFF};
+        if (cmd8_response == 0x01) {
+            for (uint8_t i = 0; i < 4; i++) r7[i] = sd_spi.transfer(0xFF);
+            detected = r7[2] == 0x01 && r7[3] == 0xAA;
         }
         digitalWrite(SD_CS, HIGH);
         sd_spi.transfer(0xFF);
-        if (!detected) delay(2);
-    } while (!detected && (int32_t)(deadline - millis()) > 0);
+    }
 
     digitalWrite(SD_CS, HIGH);
     sd_spi.endTransaction();
