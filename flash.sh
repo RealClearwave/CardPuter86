@@ -123,6 +123,8 @@ if [[ "$PACKAGE" == true ]]; then
     cp "$PARTITIONS" "$PACKAGE_DIR/partitions_0x8000.bin"
     cp "$FIRMWARE" "$PACKAGE_DIR/CardPuter86_0x10000.bin"
     cp "$FATFS_IMAGE" "$PACKAGE_DIR/fatfs_0x2A1000.bin"
+    cp "$SCRIPT_DIR/preview/cardputer86-cover.svg" "$PACKAGE_DIR/cover.svg"
+    cp "$SCRIPT_DIR/preview/cardputer86-cover.png" "$PACKAGE_DIR/cover.png"
 
     python3 "$ESPTOOL" --chip esp32s3 merge_bin \
         --flash_mode keep --flash_freq keep --flash_size 8MB \
@@ -139,6 +141,7 @@ if [[ "$PACKAGE" == true ]]; then
   "keywords": "Cardputer,8086,DOS,emulator",
   "author": "RealClearwave",
   "repository": "https://github.com/RealClearwave/CardPuter86",
+  "cover": "cover.png",
   "firmware_category": [
     {
       "Cardputer-8MB": {

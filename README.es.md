@@ -29,6 +29,8 @@ Para la primera instalacion, cargue el firmware e inicialice la particion IMG in
 
 Ejecute `./flash.sh --package` para crear una imagen completa de 8 MB que se puede importar en M5Burner v3 User Custom y un archivo ZIP con las imagenes nombradas por direccion, `m5burner.json`, el mapa de Flash y las sumas SHA-256. La version se lee de `VERSION` o se reemplaza con `--version X.Y.Z`. El empaquetado no graba el dispositivo e incluye la imagen IMG interna predeterminada.
 
+La portada de M5Burner esta disponible como [SVG](preview/cardputer86-cover.svg) y [PNG](preview/cardputer86-cover.png); ambos archivos se incluyen en cada paquete.
+
 ## Controles
 
 Las teclas normales del Cardputer corresponden a las teclas del PC. La tecla Aa corresponde a Shift, mientras que Ctrl y Alt funcionan como modificadores. Fn es la capa de funciones de CardPuter86: Fn+1 hasta Fn+0 envían F1-F10, Fn+- envía F11 y Fn+= envía F12. En el modo de texto predeterminado al estilo DSx86, Fn+;, Fn+., Fn+, y Fn+/ desplazan la vista 40x16 hacia arriba, abajo, izquierda y derecha. El desplazamiento manual activa el modo FIXED; Fn+' devuelve una vista FIXED a su posición inicial superior izquierda y Fn+Espacio restaura AUTO. AUTO sigue la última línea de contenido y mantiene fijadas hasta dos líneas de estado detectadas al pie. Opt cambia entre este modo de texto legible con celdas 6x8 y el modo escalado. El modo escalado usa una fuente 3x5 para las pantallas de texto y escala las pantallas gráficas a toda la LCD. G0 queda reservado.

@@ -64,6 +64,8 @@ The version comes from [`VERSION`](VERSION) and can be overridden with `--versio
 
 The package includes the default internal `cardputer86.img`, so installing the merged image replaces the complete device Flash.
 
+The M5Burner submission cover is available as [SVG](preview/cardputer86-cover.svg) and [PNG](preview/cardputer86-cover.png); both files are copied into every release package.
+
 ## Keyboard
 
 - `Fn` + `1` through `0`: F1 through F10

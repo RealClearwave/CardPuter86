@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">CardPuter86 M5Burner cover</title>
+  <desc id="desc">A retro-futurist Cardputer terminal with an 8086 processor motif.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#071417"/>
+      <stop offset="0.55" stop-color="#102b2b"/>
+      <stop offset="1" stop-color="#17140e"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="68%" cy="45%" r="52%">
+      <stop offset="0" stop-color="#35e7c0" stop-opacity=".22"/>
+      <stop offset=".55" stop-color="#35e7c0" stop-opacity=".04"/>
+      <stop offset="1" stop-color="#35e7c0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="device" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e7e4d8"/>
+      <stop offset="1" stop-color="#aaa99f"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#061211"/>
+      <stop offset="1" stop-color="#0a2420"/>
+    </linearGradient>
+    <pattern id="grid" width="44" height="44" patternUnits="userSpaceOnUse">
+      <path d="M44 0H0V44" fill="none" stroke="#7ae9d1" stroke-opacity=".055" stroke-width="1"/>
+    </pattern>
+    <pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse">
+      <path d="M0 3.5H1600" stroke="#9affdf" stroke-opacity=".075"/>
+    </pattern>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#000" flood-opacity=".55"/>
+    </filter>
+    <filter id="textGlow" x="-30%" y="-60%" width="160%" height="220%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect width="1600" height="900" fill="url(#glow)"/>
+  <rect width="1600" height="900" fill="url(#grid)"/>
+  <path d="M0 760C310 650 445 790 742 714c313-80 474-274 858-211v397H0Z" fill="#020707" fill-opacity=".48"/>
+  <path d="M0 762C322 650 466 799 748 715c319-95 480-273 852-212" fill="none" stroke="#f6aa3b" stroke-opacity=".28" stroke-width="3"/>
+
+  <g transform="translate(105 144)">
+    <text x="0" y="46" fill="#7ae9d1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="25" font-weight="700" letter-spacing="7">POCKET PC EMULATOR</text>
+    <text x="-5" y="180" fill="#f4f0df" font-family="Arial, Helvetica, sans-serif" font-size="108" font-weight="900" letter-spacing="-5">CardPuter</text>
+    <text x="0" y="294" fill="#f5ad42" font-family="Arial, Helvetica, sans-serif" font-size="151" font-weight="900" letter-spacing="-9" filter="url(#textGlow)">86</text>
+    <rect x="6" y="328" width="440" height="3" fill="#7ae9d1"/>
+    <text x="4" y="380" fill="#cfdbd4" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="26" letter-spacing="2">8086 / DOS / CGA</text>
+    <text x="4" y="424" fill="#829994" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="21">BUILT FOR M5STACK CARDPUTER</text>
+  </g>
+
+  <g transform="translate(640 145) rotate(-2 410 290)" filter="url(#shadow)">
+    <rect x="0" y="0" width="835" height="570" rx="44" fill="url(#device)" stroke="#fff" stroke-opacity=".4" stroke-width="4"/>
+    <rect x="50" y="50" width="458" height="220" rx="18" fill="#17211f" stroke="#777b74" stroke-width="12"/>
+    <rect x="64" y="64" width="430" height="192" rx="8" fill="url(#screen)"/>
+    <rect x="64" y="64" width="430" height="192" rx="8" fill="url(#scan)"/>
+    <text x="85" y="103" fill="#f5ad42" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="22" font-weight="700">CardPuter86 POST</text>
+    <text x="85" y="142" fill="#79f0c7" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="19">8086 CPU ........ READY</text>
+    <text x="85" y="174" fill="#79f0c7" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="19">GUEST RAM ...... 512 KB</text>
+    <text x="85" y="206" fill="#b9d9d0" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="19">A:\&gt;_</text>
+    <circle cx="583" cy="160" r="82" fill="#c4c3b9" stroke="#96978f" stroke-width="8"/>
+    <rect x="541" y="105" width="84" height="110" rx="12" fill="#172624"/>
+    <text x="583" y="153" text-anchor="middle" fill="#7ae9d1" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="800">8086</text>
+    <text x="583" y="181" text-anchor="middle" fill="#f5ad42" font-family="ui-monospace, monospace" font-size="14">CORE</text>
+    <g stroke="#7ae9d1" stroke-width="5" stroke-linecap="round">
+      <path d="M535 119h-17m17 24h-17m17 24h-17m17 24h-17"/>
+      <path d="M631 119h17m-17 24h17m-17 24h17m-17 24h17"/>
+    </g>
+
+    <g transform="translate(48 314)">
+      <rect width="738" height="203" rx="20" fill="#858780"/>
+      <g fill="#171b1a">
+        <rect x="16" y="15" width="45" height="34" rx="9"/><rect x="69" y="15" width="45" height="34" rx="9"/><rect x="122" y="15" width="45" height="34" rx="9"/><rect x="175" y="15" width="45" height="34" rx="9"/><rect x="228" y="15" width="45" height="34" rx="9"/><rect x="281" y="15" width="45" height="34" rx="9"/><rect x="334" y="15" width="45" height="34" rx="9"/><rect x="387" y="15" width="45" height="34" rx="9"/><rect x="440" y="15" width="45" height="34" rx="9"/><rect x="493" y="15" width="45" height="34" rx="9"/><rect x="546" y="15" width="45" height="34" rx="9"/><rect x="599" y="15" width="45" height="34" rx="9"/><rect x="652" y="15" width="69" height="34" rx="9"/>
+        <rect x="16" y="61" width="69" height="34" rx="9"/><rect x="93" y="61" width="45" height="34" rx="9"/><rect x="146" y="61" width="45" height="34" rx="9"/><rect x="199" y="61" width="45" height="34" rx="9"/><rect x="252" y="61" width="45" height="34" rx="9"/><rect x="305" y="61" width="45" height="34" rx="9"/><rect x="358" y="61" width="45" height="34" rx="9"/><rect x="411" y="61" width="45" height="34" rx="9"/><rect x="464" y="61" width="45" height="34" rx="9"/><rect x="517" y="61" width="45" height="34" rx="9"/><rect x="570" y="61" width="45" height="34" rx="9"/><rect x="623" y="61" width="98" height="34" rx="9"/>
+        <rect x="16" y="107" width="93" height="34" rx="9"/><rect x="117" y="107" width="45" height="34" rx="9"/><rect x="170" y="107" width="45" height="34" rx="9"/><rect x="223" y="107" width="45" height="34" rx="9"/><rect x="276" y="107" width="45" height="34" rx="9"/><rect x="329" y="107" width="45" height="34" rx="9"/><rect x="382" y="107" width="45" height="34" rx="9"/><rect x="435" y="107" width="45" height="34" rx="9"/><rect x="488" y="107" width="45" height="34" rx="9"/><rect x="541" y="107" width="45" height="34" rx="9"/><rect x="594" y="107" width="45" height="34" rx="9"/><rect x="647" y="107" width="74" height="34" rx="9"/>
+        <rect x="16" y="153" width="68" height="34" rx="9"/><rect x="92" y="153" width="68" height="34" rx="9"/><rect x="168" y="153" width="68" height="34" rx="9"/><rect x="244" y="153" width="45" height="34" rx="9"/><rect x="297" y="153" width="45" height="34" rx="9"/><rect x="350" y="153" width="45" height="34" rx="9"/><rect x="403" y="153" width="45" height="34" rx="9"/><rect x="456" y="153" width="45" height="34" rx="9"/><rect x="509" y="153" width="45" height="34" rx="9"/><rect x="562" y="153" width="45" height="34" rx="9"/><rect x="615" y="153" width="106" height="34" rx="9"/>
+      </g>
+      <rect x="16" y="153" width="68" height="34" rx="9" fill="#e15c43"/>
+      <rect x="92" y="153" width="68" height="34" rx="9" fill="#36bca3"/>
+    </g>
+  </g>
+
+  <g transform="translate(105 756)">
+    <rect width="458" height="58" rx="29" fill="#7ae9d1" fill-opacity=".1" stroke="#7ae9d1" stroke-opacity=".6"/>
+    <circle cx="35" cy="29" r="8" fill="#79f0c7"/>
+    <text x="61" y="37" fill="#dbe8e2" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="23" font-weight="700">A WHOLE PC IN YOUR POCKET</text>
+  </g>
+</svg>

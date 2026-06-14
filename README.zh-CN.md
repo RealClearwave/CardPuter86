@@ -71,6 +71,8 @@ pio run
 
 完整镜像包含默认内部磁盘，因此安装时会覆盖设备全部 Flash。
 
+M5Burner 投稿封面提供 [SVG 矢量版](preview/cardputer86-cover.svg) 和 [PNG 上传版](preview/cardputer86-cover.png)，打包时会自动复制到发布目录。
+
 ## 键盘
 
 - `Fn+1` 至 `Fn+0`：F1 至 F10
