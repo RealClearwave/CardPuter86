@@ -183,9 +183,15 @@ void cardputer_display_clear(unsigned char color_index) {
 }
 
 // ===============================================
+struct TextDisplayRow {
+    int source_x;
+    int source_y;
+};
+
 // Blit the emulator framebuffer to the Cardputer display.
-// Text mode renders CGA text directly with a 3x5 font, fitting 80x25 at 1:1.
-// Scaled mode fits the complete 320x200 framebuffer to the LCD.
+// Text mode keeps the original 4x8 framebuffer at 1:1, wrapping horizontal
+// overflow and following the bottom of content. Scaled mode uses Tom Thumb
+// 3x5 for text screens and fits graphics screens to the complete LCD.
 // ===============================================
 void tft_blit_scaled(bool emulated_graphics_mode) {
     if (!gb_frame_buffer) return;
@@ -205,7 +211,7 @@ void tft_blit_scaled(bool emulated_graphics_mode) {
         gb_tft_sprite->setPaletteColor(i, lgfx::rgb565_t(palette[i]));
     }
 
-    if (display_mode == DISPLAY_MODE_SCALED || emulated_graphics_mode) {
+    if (emulated_graphics_mode) {
         for (int y = 0; y < dh; y++) {
             unsigned char *dst = sprite_buf + y * sprite_stride;
             const int src_y = y * (FAKE86_FB_H - 1) / (dh - 1);
@@ -221,7 +227,7 @@ void tft_blit_scaled(bool emulated_graphics_mode) {
                 dst[x / 2] = (color0 << 4) | color1;
             }
         }
-    } else {
+    } else if (display_mode == DISPLAY_MODE_SCALED) {
         memset(sprite_buf, 0, sprite_stride * dh);
         const int visible_cols = cols > 80 ? 80 : cols;
         const int visible_rows = rows > 25 ? 25 : rows;
@@ -253,6 +259,70 @@ void tft_blit_scaled(bool emulated_graphics_mode) {
                         else packed = (packed & 0x0F) | (color << 4);
                     }
                 }
+            }
+        }
+    } else {
+        static const int text_row_height = 8;
+        static const int max_wrapped_rows =
+            (FAKE86_FB_H / text_row_height) * 2;
+        TextDisplayRow wrapped_rows[max_wrapped_rows];
+        int wrapped_count = 0;
+        int last_content_y = -1;
+
+        for (int y = 0; y < FAKE86_FB_H; y++) {
+            const unsigned char *src = gb_frame_buffer + y * FAKE86_FB_W;
+            for (int x = 0; x < FAKE86_FB_W; x++) {
+                if ((src[x] & 0x0F) != 0) {
+                    last_content_y = y;
+                    break;
+                }
+            }
+        }
+
+        const int source_text_rows = last_content_y < 0
+            ? 0
+            : (last_content_y / text_row_height) + 1;
+
+        for (int row = 0; row < source_text_rows; row++) {
+            const int source_y = row * text_row_height;
+            wrapped_rows[wrapped_count++] = {0, source_y};
+
+            bool has_overflow = false;
+            for (int y = 0; y < text_row_height && !has_overflow; y++) {
+                const unsigned char *src =
+                    gb_frame_buffer + (source_y + y) * FAKE86_FB_W;
+                for (int x = dw; x < FAKE86_FB_W; x++) {
+                    if ((src[x] & 0x0F) != 0) {
+                        has_overflow = true;
+                        break;
+                    }
+                }
+            }
+            if (has_overflow) wrapped_rows[wrapped_count++] = {dw, source_y};
+        }
+
+        const int wrapped_height = wrapped_count * text_row_height;
+        const int first_virtual_y = wrapped_height > dh ? wrapped_height - dh : 0;
+
+        for (int y = 0; y < dh; y++) {
+            unsigned char *dst = sprite_buf + y * sprite_stride;
+            memset(dst, 0, sprite_stride);
+            const int virtual_y = first_virtual_y + y;
+            if (virtual_y >= wrapped_height) continue;
+
+            const TextDisplayRow &row = wrapped_rows[virtual_y / text_row_height];
+            const int source_y = row.source_y + (virtual_y % text_row_height);
+            const unsigned char *src =
+                gb_frame_buffer + source_y * FAKE86_FB_W + row.source_x;
+            const int copy_width = FAKE86_FB_W - row.source_x < dw
+                ? FAKE86_FB_W - row.source_x
+                : dw;
+            for (int x = 0; x < copy_width; x += 2) {
+                const unsigned char color0 = src[x] & 0x0F;
+                const unsigned char color1 = x + 1 < copy_width
+                    ? src[x + 1] & 0x0F
+                    : 0;
+                dst[x / 2] = (color0 << 4) | color1;
             }
         }
     }

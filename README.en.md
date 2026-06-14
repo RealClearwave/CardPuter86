@@ -21,9 +21,9 @@ For a first install, upload the firmware and initialize the internal IMG partiti
 
 ## Controls
 
-The regular Cardputer keys map to the corresponding PC keys. The Aa key maps to Shift, while Ctrl and Alt act as PC modifiers. Fn is the CardPuter86 function layer: Fn+1 through Fn+0 send F1-F10, Fn+- sends F11, and Fn+= sends F12. Opt switches between the default 3x5 text mode and full-screen scaled mode. Text mode displays the complete 80x25 screen at 1:1. G0 is reserved.
+The regular Cardputer keys map to the corresponding PC keys. The Aa key maps to Shift, while Ctrl and Alt act as PC modifiers. Fn is the CardPuter86 function layer: Fn+1 through Fn+0 send F1-F10, Fn+- sends F11, and Fn+= sends F12. Opt switches between the default original-font text mode and scaled mode. Text mode keeps the original 4x8 framebuffer size with wrapping and bottom-follow; scaled mode uses a 3x5 font for text screens and scales graphics screens to the full LCD. G0 is reserved.
 
-The 3x5 text font is [Tom Thumb](https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5) by Robey Pointer, released under CC0.
+The scaled text view uses [Tom Thumb](https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5) by Robey Pointer, released under CC0.
 
 ## Disk Images
 

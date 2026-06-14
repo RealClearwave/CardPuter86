@@ -5,7 +5,7 @@ CardPuter86 is an 8086 PC emulator for the M5Stack Cardputer (ESP32-S3), based o
 ## Features
 
 - M5Stack Cardputer keyboard support
-- ST7789 LCD output with 3x5 CGA text and full-screen scaled modes
+- ST7789 LCD output with original-size text and full-screen scaled modes
 - PC speaker output through the Cardputer I2S speaker
 - Built-in BIOS, BASIC ROM and COM program support
 - Independent writable IMG storage on internal Flash and microSD
@@ -53,10 +53,10 @@ For the first installation, initialize the internal IMG partition:
 - `Fn` + `=`: F12
 - `Aa`: Shift
 - `Ctrl`, `Alt`: corresponding PC modifier keys
-- `Opt`: switch between the default 3x5 text mode and full-screen scaled mode. Text mode displays the complete 80x25 screen at 1:1 without framebuffer scaling.
+- `Opt`: switch between the default original-font text mode and scaled mode. Text mode keeps the original 4x8 framebuffer size with wrapping and bottom-follow; scaled mode uses a 3x5 font for text screens and scales graphics screens to the full LCD.
 - `G0`: reserved
 
-The 3x5 text font is [Tom Thumb](https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5) by Robey Pointer, released under CC0.
+The scaled text view uses [Tom Thumb](https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5) by Robey Pointer, released under CC0.
 
 Fn combinations replace their base keys, so `Fn+1` sends only F1 rather than both `1` and F1.
 
