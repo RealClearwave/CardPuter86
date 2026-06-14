@@ -379,7 +379,7 @@ void diskhandler()
 	 #ifdef use_lib_sna_rare
 	  jj_write86_remap(0x474,regs.byteregs[regah]);
 	 #else
-	  gb_ram_bank[0][0x474]= regs.byteregs[regah];
+	  write86(0x474, regs.byteregs[regah]);
 	 #endif
      //if (gb_use_remap_cartdridge==1)
      //{

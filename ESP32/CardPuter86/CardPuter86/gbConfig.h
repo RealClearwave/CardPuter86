@@ -91,9 +91,8 @@
  #define gb_max_portram 0x3FF
  #define use_lib_limit_portram
 
- // 128 KB leaves enough SRAM for the 320x200 framebuffer, TFT sprite,
- // SD support and TinyUSB bookkeeping on the non-PSRAM Cardputer.
- #define gb_max_ram 131072
+ // 512 KB guest RAM backed by a 128 KB SRAM page cache and Flash swap.
+ #define gb_max_ram 524288
 
  //#define use_lib_not_use_callback_port
  #define use_lib_fast_boot

@@ -66,6 +66,8 @@ When more than one image is available, startup shows a boot menu. Use `W`/`S` (o
 
 To import images from a computer, wait for the optional SD check and hold `Ctrl` when it finishes. If SD was enabled with `Alt` and detected, select either `Internal Flash` or `SD Card`; otherwise the internal Flash is exported automatically as a USB drive. Copy `.img` files to its root, safely eject it, and reboot.
 
+CardPuter86 presents 512 KB of conventional RAM to the emulated PC. A 128 KB SRAM page cache keeps active 4 KB pages in memory, while cold dirty pages are written through ESP-IDF wear levelling to a dedicated Flash partition. The swap partition is separate from the IMG filesystem.
+
 `ESP32/CardPuter86/data/cardputer86.img` is used only by `--with-images`. This option resets the internal image partition, so routine firmware updates intentionally do not run `uploadfs`.
 
 ## Documentation

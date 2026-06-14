@@ -43,6 +43,7 @@
 #include "gbGlobals.h"
 #include <Arduino.h>
 #include "dataFlash/gbsnarare.h"
+#include "guest_memory.h"
 
 extern struct i8253_s i8253;
 
@@ -270,6 +271,7 @@ void SetRAMTruco()
   case 196608: gb_ram_truco_low= 0xC0; gb_ram_truco_high= 0x00; break; //192 KB
   case 229376: gb_ram_truco_low= 0xE0; gb_ram_truco_high= 0x00; break; //224 KB
   case 262144: gb_ram_truco_low= 0x00; gb_ram_truco_high= 0x01; break; //256 KB
+  case 524288: gb_ram_truco_low= 0x00; gb_ram_truco_high= 0x02; break; //512 KB
   case 655360: gb_ram_truco_low= 0x80; gb_ram_truco_high= 0x02; break; //640 KB
  } 
 }
@@ -286,12 +288,12 @@ void bootstrapPoll()
    jj_write86_remap(0x413,gb_ram_truco_low);
    jj_write86_remap(0x414,gb_ram_truco_high);
   #else 
-   gb_ram_00[0x410]= 0x41;
-   gb_ram_00[0x475]= 0;
+   guest_memory_write(0x410, 0x41);
+   guest_memory_write(0x475, 0);
 
    //gb_ram_00[0x413]= 0x80; gb_ram_00[0x414]= 0x00; //128 KB
-   gb_ram_bank[0][0x413]= gb_ram_truco_low;
-   gb_ram_bank[0][0x414]= gb_ram_truco_high;    
+   guest_memory_write(0x413, gb_ram_truco_low);
+   guest_memory_write(0x414, gb_ram_truco_high);
   #endif
 //  if (gb_use_remap_cartdridge==1)
 //  {
@@ -342,7 +344,7 @@ unsigned char jj_read86_remap(unsigned int addr32)
     return 0;
    }
    //return gb_use_minimal_ram[addrDest];
-   return gb_ram_bank[0][addrDest];
+   return guest_memory_read(addrDest);
   }
  }
 }
@@ -375,7 +377,7 @@ void jj_write86_remap(unsigned int addr32, unsigned char value)
    if (addrDest>32000)
     return;
    //gb_use_minimal_ram[addrDest]= value; 
-   gb_ram_bank[0][addrDest]= value;
+   guest_memory_write(addrDest, value);
   }
  }
 }
@@ -384,9 +386,6 @@ void jj_write86_remap(unsigned int addr32, unsigned char value)
 //********************************************************
 void write86 (unsigned int addr32, unsigned char value)
 {
- unsigned char idRAM;
- unsigned short int auxOffs;
-
  //Primero video
  //Primero CGA
  //if ((addr32 >= 0xB8000) && (addr32 < (0xB8000+16384)))
@@ -410,9 +409,7 @@ void write86 (unsigned int addr32, unsigned char value)
    }
   #endif
 
-  idRAM= (addr32>>15);
-  auxOffs = (addr32 & 32767);
-  gb_ram_bank[idRAM][auxOffs]= value;
+  guest_memory_write(addr32, value);
   //switch (idRAM)
   //{
   // case 0: gb_ram_00[auxOffs]= value; break;
@@ -421,6 +418,7 @@ void write86 (unsigned int addr32, unsigned char value)
   // case 3: gb_ram_03[auxOffs]= value; break;
   // default: return;   
   //}     
+  return;
  }
  
  //if (!didbootstrap)
@@ -480,9 +478,7 @@ void write86 (unsigned int addr32, unsigned char value)
    }
   #endif
 
-  idRAM= (addr32>>15);
-  auxOffs = (addr32 & 32767);
-  gb_ram_bank[idRAM][auxOffs]= value;  
+  if (addr32 < gb_max_ram) guest_memory_write(addr32, value);
  }
 
 }
@@ -572,10 +568,6 @@ void write86 (uint32_t addr32, uint8_t value)
 
 unsigned char read86 (unsigned int addr32) 
 {
- //BIOS ADDR
- unsigned short int auxOffs;
- unsigned char idRAM;
-
  //Primero video
  //Primero CGA
  //if ((addr32 >= 0xB8000) && (addr32 < (0xB8000+16384)))
@@ -594,9 +586,7 @@ unsigned char read86 (unsigned int addr32)
    }  
   #endif 
 
-  idRAM= (addr32>>15);
-  auxOffs = (addr32 & 32767);
-  return (gb_ram_bank[idRAM][auxOffs]);
+  return guest_memory_read(addr32);
   //switch (idRAM)
   //{
   // case 0: return gb_ram_00[auxOffs]; break;
@@ -716,9 +706,8 @@ unsigned char read86 (unsigned int addr32)
    }  
   #endif 
 
-  idRAM= (addr32>>15);
-  auxOffs = (addr32 & 32767);  
-  return (gb_ram_bank[idRAM][auxOffs]);  
+  if (addr32 < gb_max_ram) return guest_memory_read(addr32);
+  return 0;
  }
 
  //if (!didbootstrap)
@@ -4167,4 +4156,3 @@ void exec86 (uint32_t execloops) {
 				}
 		}
 }
-

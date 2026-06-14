@@ -30,6 +30,7 @@
 #include "cardputer_kbd.h"
 #include "cardputer_speaker.h"
 #include "cardputer_storage.h"
+#include "guest_memory.h"
 
 // ===============================================
 // Global variables (defined here, extern in gbGlobals.h)
@@ -92,14 +93,6 @@ void *gb_portTiny_read_callback[5];
 unsigned char cf;
 unsigned char hdcount = 0;
 unsigned char running = 0;
-
-// RAM banks
-unsigned char *gb_ram_00 = NULL;
-unsigned char *gb_ram_01 = NULL;
-unsigned char *gb_ram_02 = NULL;
-unsigned char *gb_ram_03 = NULL;
-unsigned char *gb_ram_04 = NULL;
-unsigned char *gb_ram_bank[5];
 
 // CGA video memory
 unsigned char gb_video_cga[16384];
@@ -216,40 +209,14 @@ void ProcesarAcciones() {
 // Clear all emulated RAM
 // ===============================================
 void ClearRAM() {
-    for (int i = 0; i < gb_max_ram; i++) {
-        write86(i, 0);
-    }
+    guest_memory_clear();
 }
 
 // ===============================================
 // Allocate RAM banks for emulator
 // ===============================================
 bool CreateRAM() {
-    gb_ram_00 = (unsigned char *)malloc(32768);
-    gb_ram_01 = (unsigned char *)malloc(32768);
-    gb_ram_02 = (unsigned char *)malloc(32768);
-    gb_ram_03 = (unsigned char *)malloc(32768);
-
-    if (!gb_ram_00 || !gb_ram_01 || !gb_ram_02 || !gb_ram_03) {
-        free(gb_ram_00);
-        free(gb_ram_01);
-        free(gb_ram_02);
-        free(gb_ram_03);
-        gb_ram_00 = gb_ram_01 = gb_ram_02 = gb_ram_03 = NULL;
-        return false;
-    }
-
-    memset(gb_ram_00, 0, 32768);
-    memset(gb_ram_01, 0, 32768);
-    memset(gb_ram_02, 0, 32768);
-    memset(gb_ram_03, 0, 32768);
-
-    gb_ram_bank[0] = gb_ram_00;
-    gb_ram_bank[1] = gb_ram_01;
-    gb_ram_bank[2] = gb_ram_02;
-    gb_ram_bank[3] = gb_ram_03;
-    gb_ram_bank[4] = NULL;
-    return true;
+    return guest_memory_init();
 }
 
 // ===============================================
@@ -491,9 +458,9 @@ void setup() {
     cardputer_display_init();
     tft_log("Display ready");
 
-    tft_log("Allocating 128 KB emulator RAM...");
-    // Reserve the four contiguous emulator RAM banks before filesystems and
-    // drivers fragment the remaining heap.
+    tft_log("Allocating 512 KB paged RAM...");
+    // Reserve the 128 KB SRAM page cache before filesystems and drivers
+    // fragment the remaining heap. Cold guest pages use the swap partition.
     if (!CreateRAM()) {
         tft_log("ERROR: emulator RAM allocation failed");
 #ifdef use_lib_log_serial
@@ -502,7 +469,7 @@ void setup() {
 #endif
         while (true) delay(1000);
     }
-    tft_log("Emulator RAM ready");
+    tft_log("512 KB guest RAM ready");
     ClearRAM();
     SetRAMTruco();
     bootstrapPoll();
@@ -523,7 +490,7 @@ void setup() {
 
     // BIOS data area: number of installed hard disks.
     if (gb_disk_image.mounted && gb_disk_image.drive == 0x80) {
-        gb_ram_bank[0][0x475] = 1;
+        write86(0x475, 1);
         hdcount = 1;
     }
 

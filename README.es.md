@@ -29,6 +29,8 @@ Los archivos `.img` grabables se guardan en una particion FAT independiente de l
 
 Después de la comprobación opcional de SD, mantenga pulsado `Ctrl` para entrar en modo USB. Si la SD se activó con `Alt` y fue detectada, elija Flash interna o SD; de lo contrario se exporta la Flash interna. Copie los IMG, expulse la unidad de forma segura y reinicie.
 
+CardPuter86 presenta 512 KB de memoria convencional al PC emulado. Las páginas activas de 4 KB usan una caché SRAM de 128 KB; las páginas sucias frías se guardan mediante wear levelling de ESP-IDF en una partición Flash dedicada, separada del sistema de archivos IMG.
+
 ## Software integrado
 
 Los datos ROM y programas COM se encuentran en `ESP32/CardPuter86/CardPuter86/dataFlash`. La imagen independiente predeterminada es `ESP32/CardPuter86/data/cardputer86.img`.

@@ -308,10 +308,10 @@ void vidinterrupt()
 				 jj_write86_remap(0x484,(rows - 1));				
 				#else
 				 //Optimizado
-				 gb_ram_bank[0][0x449]= vidmode;
-				 gb_ram_bank[0][0x44A]= cols;
-				 gb_ram_bank[0][0x44B]= 0;
-				 gb_ram_bank[0][0x484]= (rows - 1);				
+				 write86(0x449, vidmode);
+				 write86(0x44A, cols);
+				 write86(0x44B, 0);
+				 write86(0x484, rows - 1);
 				#endif
                 //if (gb_use_remap_cartdridge==1)
 				//{

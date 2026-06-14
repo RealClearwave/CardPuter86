@@ -69,13 +69,6 @@
 
  extern unsigned char gb_video_cga[16384];
 
- extern unsigned char *gb_ram_00; //32 KB
- extern unsigned char *gb_ram_01;
- extern unsigned char *gb_ram_02;
- extern unsigned char *gb_ram_03;
- extern unsigned char *gb_ram_04;
- extern unsigned char *gb_ram_bank[5];
-
  // Cardputer: flat framebuffer 320x200 byte-indexed
  extern unsigned char *gb_frame_buffer;
 

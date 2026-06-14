@@ -69,7 +69,7 @@ echo ""
 
 ESPTOOL="$(find "$HOME/.platformio/packages/tool-esptoolpy" -maxdepth 1 -type f -name 'esptool.py' | head -n 1 || true)"
 FATFS_IMAGE="$PROJECT_DIR/.pio/build/$PIO_ENV/fatfs.bin"
-FATFS_OFFSET="0x211000"
+FATFS_OFFSET="0x2A1000"
 
 # 3. Confirm
 PARTITIONS="$PROJECT_DIR/.pio/build/$PIO_ENV/partitions.bin"

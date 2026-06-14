@@ -29,6 +29,8 @@ Writable `.img` files live in an independent FAT partition in internal Flash or 
 
 After the optional SD check, hold `Ctrl` to enter USB storage mode. If SD was enabled with `Alt` and detected, choose internal Flash or SD; otherwise internal Flash is exported automatically. Copy IMG files, safely eject the drive, and reboot.
 
+CardPuter86 exposes 512 KB of conventional RAM to the emulated PC. Active 4 KB pages use a 128 KB SRAM cache; cold dirty pages are written through ESP-IDF wear levelling to a dedicated Flash partition separate from the IMG filesystem.
+
 ## Embedded software
 
 ROM and COM data compiled into the firmware is stored under `ESP32/CardPuter86/CardPuter86/dataFlash`. The default independent image is `ESP32/CardPuter86/data/cardputer86.img`.
