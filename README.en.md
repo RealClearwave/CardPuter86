@@ -29,7 +29,7 @@ Writable `.img` files live in an independent FAT partition in internal Flash or 
 
 After the optional SD check, hold `Ctrl` to enter USB storage mode. If SD was enabled with `Alt` and detected, choose internal Flash or SD; otherwise internal Flash is exported automatically. Copy IMG files, safely eject the drive, and reboot.
 
-CardPuter86 exposes 512 KB of conventional RAM to the emulated PC. Active 4 KB pages use a 128 KB SRAM cache; cold dirty pages are written through ESP-IDF wear levelling to a dedicated Flash partition separate from the IMG filesystem.
+Press `Ctrl` after the SD check to open POST Settings. USB disk mode applies only to the current boot. The 512 KB memory option is stored in NVS across power cycles; when disabled, the emulated PC uses 128 KB. In 512 KB mode, active 4 KB pages use a 128 KB SRAM cache and cold dirty pages use a dedicated wear-levelled Flash partition.
 
 ## Embedded software
 

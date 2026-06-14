@@ -1,5 +1,6 @@
 #include "cardputer_storage.h"
 #include "hardware.h"
+#include "guest_memory.h"
 #include <Arduino.h>
 #include <M5Cardputer.h>
 #include <SD.h>
@@ -485,9 +486,8 @@ bool cardputer_storage_init_and_select(void) {
         delay(250);
     }
 
-    // USB export is offered only after the optional SD probe and before a
-    // boot image filesystem is reopened. Raw MSC access must not overlap a
-    // mounted boot image.
+    // Settings is offered after storage probing and before a boot image
+    // filesystem is reopened. Raw MSC access must not overlap a mounted image.
     cardputer_storage_enter_usb_mode_if_requested();
     show_probe_status("Selecting boot image...");
 
@@ -515,33 +515,39 @@ void cardputer_storage_show_boot_status(void) {
     display.setCursor(6, 37);
     display.printf("SD card: %s", sd_detected ? "detected" : "not inserted");
 
+    display.setTextColor(guest_memory_512k_enabled() ? TFT_GREEN : TFT_YELLOW,
+                         TFT_BLACK);
+    display.setCursor(6, 50);
+    display.printf("Guest RAM: %s",
+                   guest_memory_512k_enabled() ? "512 KB" : "128 KB");
+
     if (gb_disk_image.mounted) {
         display.setTextColor(TFT_CYAN, TFT_BLACK);
-        display.setCursor(6, 54);
+        display.setCursor(6, 63);
         display.printf("Boot source: %s",
                        gb_disk_image.storage == CARDPUTER_STORAGE_FLASH ?
                        "Internal Flash" : "SD card");
         display.setTextColor(TFT_WHITE, TFT_BLACK);
-        display.setCursor(6, 67);
+        display.setCursor(6, 76);
         display.printf("Image: %.34s", base_name(gb_disk_image.path));
-        display.setCursor(6, 80);
+        display.setCursor(6, 89);
         display.printf("Size: %lu KB", (unsigned long)(gb_disk_image.size / 1024));
-        display.setCursor(6, 93);
+        display.setCursor(6, 102);
         display.printf("Emulated drive: %s",
                        gb_disk_image.drive == 0x80 ? "C: hard disk" : "A: floppy");
         display.setTextColor(TFT_GREEN, TFT_BLACK);
-        display.setCursor(6, 112);
+        display.setCursor(6, 122);
         display.print("Boot image ready");
         delay(1200);
     } else {
         display.setTextColor(TFT_RED, TFT_BLACK);
-        display.setCursor(6, 58);
+        display.setCursor(6, 66);
         display.print("No bootable IMG found");
         display.setTextColor(TFT_WHITE, TFT_BLACK);
-        display.setCursor(6, 76);
-        display.print("Hold Ctrl after SD check");
-        display.setCursor(6, 89);
-        display.print("to import an IMG over USB");
+        display.setCursor(6, 84);
+        display.print("Press Ctrl for Settings");
+        display.setCursor(6, 97);
+        display.print("and choose USB disk mode");
         delay(2500);
     }
 }
@@ -715,25 +721,8 @@ static bool start_usb_msc(CardputerStorageType storage) {
     return true;
 }
 
-bool cardputer_storage_enter_usb_mode_if_requested(void) {
-    const uint32_t detection_deadline = millis() + 300;
-    bool ctrl_pressed = false;
-    do {
-        M5Cardputer.update();
-        ctrl_pressed = M5Cardputer.Keyboard.keysState().ctrl;
-        if (ctrl_pressed) break;
-        delay(10);
-    } while ((int32_t)(detection_deadline - millis()) > 0);
-    if (!ctrl_pressed) return false;
-
+static bool start_selected_usb_mode(void) {
     auto &display = M5Cardputer.Display;
-    display.fillScreen(TFT_BLACK);
-    display.setTextColor(TFT_WHITE, TFT_BLACK);
-    display.setTextSize(1);
-    display.setCursor(8, 42);
-    display.print("Ctrl pressed: USB disk mode");
-    delay(250);
-
     CardputerStorageType selected = CARDPUTER_STORAGE_FLASH;
     if (sd_detected && mount_sd_timed()) {
         const char *items[] = {"Internal Flash", "SD Card"};
@@ -765,4 +754,36 @@ bool cardputer_storage_enter_usb_mode_if_requested(void) {
     display.setCursor(8, 78);
     display.print("Reboot after safe eject");
     while (true) delay(1000);
+}
+
+bool cardputer_storage_enter_usb_mode_if_requested(void) {
+    show_probe_status("Storage check complete", "Press Ctrl for Settings (1.5s)");
+    const uint32_t detection_deadline = millis() + 1500;
+    bool ctrl_pressed = false;
+    do {
+        M5Cardputer.update();
+        ctrl_pressed = M5Cardputer.Keyboard.keysState().ctrl;
+        if (ctrl_pressed) break;
+        delay(10);
+    } while ((int32_t)(detection_deadline - millis()) > 0);
+    if (!ctrl_pressed) return false;
+
+    while (true) {
+        char ram_item[32];
+        snprintf(ram_item, sizeof(ram_item), "512 KB memory: %s",
+                 guest_memory_512k_enabled() ? "Enabled" : "Disabled");
+        const char *items[] = {"USB disk mode", ram_item, "Continue boot"};
+        const uint8_t choice = choose_menu(
+            "CardPuter86 Settings", items, 3, 0, false);
+        if (choice == 0) return start_selected_usb_mode();
+        if (choice == 1) {
+            const bool enable = !guest_memory_512k_enabled();
+            if (!guest_memory_set_512k_enabled(enable)) {
+                show_probe_status("512 KB mode failed", "Swap partition unavailable");
+                delay(1500);
+            }
+            continue;
+        }
+        return false;
+    }
 }

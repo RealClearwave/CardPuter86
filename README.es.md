@@ -29,7 +29,7 @@ Los archivos `.img` grabables se guardan en una particion FAT independiente de l
 
 Después de la comprobación opcional de SD, mantenga pulsado `Ctrl` para entrar en modo USB. Si la SD se activó con `Alt` y fue detectada, elija Flash interna o SD; de lo contrario se exporta la Flash interna. Copie los IMG, expulse la unidad de forma segura y reinicie.
 
-CardPuter86 presenta 512 KB de memoria convencional al PC emulado. Las páginas activas de 4 KB usan una caché SRAM de 128 KB; las páginas sucias frías se guardan mediante wear levelling de ESP-IDF en una partición Flash dedicada, separada del sistema de archivos IMG.
+Pulse `Ctrl` después de la comprobación SD para abrir Settings. El modo USB sólo se aplica al arranque actual. La opción de memoria de 512 KB se guarda en NVS y persiste tras apagar; desactivada, el PC emulado usa 128 KB. En modo 512 KB, las páginas activas usan una caché SRAM de 128 KB y las páginas frías una partición Flash con wear levelling.
 
 ## Software integrado
 

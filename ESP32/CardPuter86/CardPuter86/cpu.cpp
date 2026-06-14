@@ -264,7 +264,7 @@ unsigned char gb_ram_truco_high=0x00;
 //Fuerzo RAM
 void SetRAMTruco()
 {
- switch (gb_max_ram)
+ switch (guest_memory_size())
  {
   case 131072: gb_ram_truco_low= 0x80; gb_ram_truco_high= 0x00; break; //128 KB
   case 163840: gb_ram_truco_low= 0xA0; gb_ram_truco_high= 0x00; break; //160 KB
@@ -397,7 +397,7 @@ void write86 (unsigned int addr32, unsigned char value)
  }
 
  //Segundo memoria
- if ((addr32>=0) && (addr32<gb_max_ram))
+ if ((addr32>=0) && (addr32<guest_memory_size()))
  {
   //JJ RAM[addr32] = value;
   //JJ return;
@@ -478,7 +478,7 @@ void write86 (unsigned int addr32, unsigned char value)
    }
   #endif
 
-  if (addr32 < gb_max_ram) guest_memory_write(addr32, value);
+  if (addr32 < guest_memory_size()) guest_memory_write(addr32, value);
  }
 
 }
@@ -577,7 +577,7 @@ unsigned char read86 (unsigned int addr32)
  } 
 
  //Segundo memoria RAM
- if ((addr32>=0) && (addr32<gb_max_ram))
+ if ((addr32>=0) && (addr32<guest_memory_size()))
  {
   #ifdef use_lib_sna_rare
    if (gb_use_remap_cartdridge==1)
@@ -706,7 +706,7 @@ unsigned char read86 (unsigned int addr32)
    }  
   #endif 
 
-  if (addr32 < gb_max_ram) return guest_memory_read(addr32);
+  if (addr32 < guest_memory_size()) return guest_memory_read(addr32);
   return 0;
  }
 

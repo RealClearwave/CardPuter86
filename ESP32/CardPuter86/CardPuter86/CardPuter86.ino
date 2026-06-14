@@ -458,7 +458,7 @@ void setup() {
     cardputer_display_init();
     tft_log("Display ready");
 
-    tft_log("Allocating 512 KB paged RAM...");
+    tft_log("Allocating paged guest RAM...");
     // Reserve the 128 KB SRAM page cache before filesystems and drivers
     // fragment the remaining heap. Cold guest pages use the swap partition.
     if (!CreateRAM()) {
@@ -469,16 +469,20 @@ void setup() {
 #endif
         while (true) delay(1000);
     }
-    tft_log("512 KB guest RAM ready");
+    tft_log(guest_memory_512k_enabled()
+        ? "512 KB guest RAM ready"
+        : "128 KB guest RAM ready");
+
+    // Probe storage, show Settings when Ctrl is pressed, then select the IMG.
+    // Settings may change the effective guest RAM size for this boot.
+    cardputer_storage_init_and_select();
+
     ClearRAM();
     SetRAMTruco();
     bootstrapPoll();
     memset(gb_key_cur, 1, sizeof(gb_key_cur));
     memset(gb_key_before, 1, sizeof(gb_key_before));
     FuerzoParityRAM();
-
-    // Mount internal Flash/SD storage and select the boot IMG.
-    cardputer_storage_init_and_select();
     bootdrive = gb_disk_image.mounted ? gb_disk_image.drive : 255;
     cardputer_storage_show_boot_status();
 
