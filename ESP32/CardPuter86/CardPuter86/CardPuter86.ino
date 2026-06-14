@@ -490,9 +490,6 @@ void setup() {
     // Initialize TFT display (draws boot log on screen)
     cardputer_display_init();
     tft_log("Display ready");
-    tft_log("Checking Opt USB request...");
-
-    cardputer_storage_enter_usb_mode_if_requested();
 
     tft_log("Allocating 128 KB emulator RAM...");
     // Reserve the four contiguous emulator RAM banks before filesystems and

@@ -484,6 +484,11 @@ bool cardputer_storage_init_and_select(void) {
         show_probe_status("SD skipped", "Using internal IMG only");
         delay(250);
     }
+
+    // USB export is offered only after the optional SD probe and before a
+    // boot image filesystem is reopened. Raw MSC access must not overlap a
+    // mounted boot image.
+    cardputer_storage_enter_usb_mode_if_requested();
     show_probe_status("Selecting boot image...");
 
 #ifdef use_lib_log_serial
@@ -737,7 +742,7 @@ bool cardputer_storage_enter_usb_mode_if_requested(void) {
     }
 
     CardputerStorageType selected = CARDPUTER_STORAGE_FLASH;
-    if (mount_sd()) {
+    if (sd_detected && mount_sd_timed()) {
         const char *items[] = {"Internal Flash", "SD Card"};
         uint8_t choice = choose_menu("USB storage source", items, 2, 0, false);
         selected = choice == 0 ? CARDPUTER_STORAGE_FLASH : CARDPUTER_STORAGE_SD;
