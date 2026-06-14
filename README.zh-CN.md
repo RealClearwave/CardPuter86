@@ -1,0 +1,108 @@
+# CardPuter86
+
+CardPuter86 是运行于 M5Stack Cardputer（ESP32-S3）上的 8086 PC 模拟器，基于 Fake86 与 ESP32TinyFake86，适配了 Cardputer 的键盘、240×135 屏幕、扬声器、内部 Flash 和 microSD。
+
+| 上电自检 | BIOS 启动 |
+| --- | --- |
+| ![CardPuter86 上电自检](preview/cardputer86-post.png) | ![CardPuter86 BIOS](preview/cardputer86-bios.png) |
+| DOS | IBM BASIC |
+| ![CardPuter86 DOS](preview/cardputer86-dos.png) | ![CardPuter86 BASIC](preview/cardputer86-basic.png) |
+
+## 功能
+
+- 支持 Cardputer 内置键盘及 Fn 功能层
+- DSx86 风格的 40×16 文字视口与全屏缩放模式
+- 支持 PC Speaker、CGA 文本与图形输出
+- 支持内部 Flash 和 microSD 中的可写 `.img` 磁盘镜像
+- 支持 USB 磁盘模式、启动镜像选择和持久化 512KB 内存模式
+- 提供 PlatformIO 构建、烧录和 M5Burner 发布打包脚本
+
+## 构建
+
+需要 Python 3 和 PlatformIO Core：
+
+```sh
+cd ESP32/CardPuter86
+pio run
+```
+
+也可在项目根目录仅构建固件和内部 FAT 镜像：
+
+```sh
+./flash.sh --build-only
+```
+
+## 烧录
+
+普通更新只替换固件，保留用户导入的镜像：
+
+```sh
+./flash.sh
+```
+
+首次安装或需要恢复默认内部镜像时：
+
+```sh
+./flash.sh --with-images
+```
+
+`--with-images` 会擦除整个设备，并重新写入分区表、固件和默认 `cardputer86.img`。
+
+## M5Burner 发布包
+
+生成完整的 M5Burner 发布产物，不会烧录设备：
+
+```sh
+./flash.sh --package
+```
+
+版本号默认读取根目录的 [`VERSION`](VERSION)，也可临时指定：
+
+```sh
+./flash.sh --package --version 0.2.0
+```
+
+产物位于 `release/M5Burner/`，包含：
+
+- 可导入 M5Burner v3 User Custom 的完整 8MB 合并镜像
+- 按烧录偏移命名的 bootloader、分区表、应用和 FAT 镜像
+- `m5burner.json`、Flash 布局说明和 SHA-256 校验文件
+- 可直接发布的 ZIP 压缩包
+
+完整镜像包含默认内部磁盘，因此安装时会覆盖设备全部 Flash。
+
+## 键盘
+
+- `Fn+1` 至 `Fn+0`：F1 至 F10
+- `Fn+-`：F11
+- `Fn+=`：F12
+- `Aa`：Shift
+- `Ctrl`、`Alt`：对应的 PC 修饰键
+- `Opt`：切换文字模式与缩放模式
+- `Fn+;`、`Fn+.`：文字视口向上、向下滚动
+- `Fn+,`、`Fn+/`：文字视口向左、向右滚动
+- `Fn+'`：FIXED 模式回到左上初始位置
+- `Fn+空格`：恢复 AUTO 自动跟随模式
+- `G0`：保留
+
+默认文字模式使用 BSD 许可的 Adafruit Classic 5×7 字形，以 6×8 单元显示 40×16 个字符。缩放模式使用 CC0 许可的 Tom Thumb 3×5 字体显示完整文本屏幕，图形模式则缩放至全屏。
+
+文字视口默认处于 AUTO 模式，自动跟随正文最后一行，并尝试识别和固定底部最多两行状态栏。使用任意 Fn 方向组合后进入 FIXED 模式，不再自动滚动；按 `Fn+空格` 返回 AUTO。
+
+## 磁盘镜像与启动
+
+内部 Flash 的独立 FAT 分区和 microSD 根目录均可存放普通可写 `.img` 文件，同时兼容旧 `.dsk` 文件。检测到多个镜像时，启动菜单可用 `W`/`S` 和回车选择，也可按 `1` 至 `9` 直接选择。
+
+软盘尺寸镜像作为 `A:` 启动，大于 2.88MB 的镜像作为硬盘 `C:` 启动。默认 `cardputer86.img` 在无操作四秒后自动启动。
+
+## SD 卡、USB 磁盘与设置
+
+POST 阶段按住 `Alt` 才会探测并挂载 SD 卡；未插卡时不会阻塞启动。SD 探测完成后按 `Ctrl` 进入设置页，可临时启用 USB 磁盘模式，或切换持久化的 512KB 内存模式。
+
+USB 磁盘模式可将内部 Flash 或已挂载的 SD 卡导出给电脑，用于复制 `.img` 镜像。完成后请在电脑端安全弹出，再重启 Cardputer。
+
+512KB 模式使用 128KB SRAM 页缓存，并将不活跃的脏页写入带磨损均衡的专用 Flash 分区；关闭后模拟机使用 128KB 内存。该选项保存在 NVS 中，断电后仍然有效。
+
+## 许可与致谢
+
+CardPuter86 使用 Mike Chambers 的 Fake86 模拟器核心，并基于 Ackerman 的 ESP32TinyFake86。各上游代码和内嵌软件继续遵循其原有许可证与署名要求。

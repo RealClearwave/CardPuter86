@@ -2,6 +2,12 @@
 
 CardPuter86 is a compact 8086 PC emulator for the M5Stack Cardputer. It adapts the Fake86 emulator and ESP32TinyFake86 codebase to the Cardputer's ESP32-S3, integrated keyboard, 240x135 display, speaker and microSD interface.
 
+| POST | BIOS |
+| --- | --- |
+| ![CardPuter86 POST](preview/cardputer86-post.png) | ![CardPuter86 BIOS](preview/cardputer86-bios.png) |
+| DOS | BASIC |
+| ![CardPuter86 DOS](preview/cardputer86-dos.png) | ![CardPuter86 BASIC](preview/cardputer86-basic.png) |
+
 ## Building with PlatformIO
 
 Open `ESP32/CardPuter86` as the PlatformIO project or build from a terminal:
@@ -18,6 +24,10 @@ For a first install, upload the firmware and initialize the internal IMG partiti
 ```
 
 `--with-images` erases the device and reinstalls the default image partition. Later `./flash.sh` runs update only the firmware and preserve images imported by the user.
+
+## M5Burner Release
+
+Run `./flash.sh --package` to create a complete 8 MB merged image for M5Burner v3 User Custom import and a ZIP bundle containing offset-named images, `m5burner.json`, the flash layout, and SHA-256 checksums. The version is read from `VERSION` or overridden with `--version X.Y.Z`. Packaging never flashes the device and includes the default internal IMG.
 
 ## Controls
 
