@@ -67,10 +67,13 @@ fi
 echo "[PORT] $PORT"
 echo ""
 
+ESPTOOL="$(find "$HOME/.platformio/packages/tool-esptoolpy" -maxdepth 1 -type f -name 'esptool.py' | head -n 1 || true)"
+FATFS_IMAGE="$PROJECT_DIR/.pio/build/$PIO_ENV/fatfs.bin"
+FATFS_OFFSET="0x211000"
+
 # 3. Confirm
 PARTITIONS="$PROJECT_DIR/.pio/build/$PIO_ENV/partitions.bin"
 if [[ "$WITH_IMAGES" == false && -f "$PARTITIONS" ]]; then
-    ESPTOOL="$(find "$HOME/.platformio/packages/tool-esptoolpy" -maxdepth 1 -type f -name 'esptool.py' | head -n 1 || true)"
     CURRENT_PARTITIONS="$(mktemp /tmp/cardputer86-partitions.XXXXXX)"
     if [[ -n "$ESPTOOL" ]] && python3 "$ESPTOOL" --chip esp32s3 --port "$PORT" \
         read_flash 0x8000 0xC00 "$CURRENT_PARTITIONS" >/dev/null 2>&1; then
@@ -101,8 +104,22 @@ echo "[FLASH] Uploading..."
     --target upload --upload-port "$PORT"
 if [[ "$WITH_IMAGES" == true ]]; then
     echo "[FLASH] Uploading internal disk filesystem..."
-    "$PIO_BIN" run --project-dir "$PROJECT_DIR" --environment "$PIO_ENV" \
-        --target uploadfs --upload-port "$PORT"
+    if [[ -z "$ESPTOOL" || ! -f "$FATFS_IMAGE" ]]; then
+        echo "[ERROR] esptool or fatfs.bin is missing."
+        exit 1
+    fi
+    echo "[WAIT] Waiting for Cardputer USB to re-enumerate..."
+    sleep 3
+    PORT="$(find /dev -maxdepth 1 -type c \( -name 'cu.usbmodem*' -o -name 'cu.usbserial*' \) 2>/dev/null | sort | head -n 1 || true)"
+    if [[ -z "$PORT" ]]; then
+        echo "[ERROR] Cardputer did not reappear after firmware upload."
+        exit 1
+    fi
+    echo "[FLASH] Raw FAT image: $FATFS_IMAGE"
+    echo "[FLASH] Raw FAT offset: $FATFS_OFFSET (no transport compression)"
+    python3 "$ESPTOOL" --chip esp32s3 --port "$PORT" --baud 460800 \
+        --before default_reset --after hard_reset write_flash --no-compress \
+        "$FATFS_OFFSET" "$FATFS_IMAGE"
 else
     echo "[KEEP] Internal IMG partition was not changed."
 fi

@@ -122,15 +122,10 @@ void cardputer_display_init(void) {
     M5Cardputer.Display.setCursor(2, 1);
     M5Cardputer.Display.print("CardPuter86");
 
-    tft_log("CardPuter86 PC Emulator");
-    tft_log_num("LCD:", dw);
-    tft_log_num("x", dh);
-
     // 2. Init framebuffer
     gb_frame_buffer = (unsigned char *)malloc(FAKE86_FB_W * FAKE86_FB_H);
     if (gb_frame_buffer) {
         memset(gb_frame_buffer, 0, FAKE86_FB_W * FAKE86_FB_H);
-        tft_log("Framebuffer 320x200 OK");
     } else {
         tft_log("ERROR: FB malloc failed");
     }
@@ -141,16 +136,14 @@ void cardputer_display_init(void) {
         gb_tft_sprite->setPsram(false);
         gb_tft_sprite->setColorDepth(4);
         void *buf = gb_tft_sprite->createSprite(dw, dh);
-        tft_log_num("Sprite buf:", (unsigned long)buf);
+        if (!buf) tft_log("ERROR: display buffer failed");
     }
 
     // 4. Init palette
     init_tft_palette();
-    tft_log("Palette RGB565 OK");
 
     // 5. Backlight
     M5Cardputer.Display.setBrightness(128);
-    tft_log("Backlight ON");
 }
 
 // ===============================================
@@ -322,25 +315,36 @@ void cardputer_display_update_mode_button(void) {
 // ===============================================
 // On-screen log — draw text directly to TFT
 // ===============================================
-static int tft_log_line = 0;
-static const int TFT_LOG_MAX = 16;
+static const int TFT_LOG_MAX = 8;
+static const int TFT_LOG_CHARS = 39;
+static char tft_log_lines[TFT_LOG_MAX][TFT_LOG_CHARS + 1];
+static int tft_log_count = 0;
+
+static void redraw_tft_log(void) {
+    M5Cardputer.Display.fillRect(0, 14, M5Cardputer.Display.width(),
+                                 M5Cardputer.Display.height() - 14, TFT_BLACK);
+    M5Cardputer.Display.setTextSize(1.0);
+    for (int i = 0; i < tft_log_count; i++) {
+        M5Cardputer.Display.setTextColor(TFT_WHITE, TFT_BLACK);
+        M5Cardputer.Display.setCursor(3, 16 + i * 14);
+        M5Cardputer.Display.print(tft_log_lines[i]);
+    }
+}
 
 void tft_log(const char *msg) {
-    if (tft_log_line >= TFT_LOG_MAX) return;
-    M5Cardputer.Display.setTextColor(TFT_WHITE, TFT_BLACK);
-    M5Cardputer.Display.setTextSize(1.0);
-    M5Cardputer.Display.setCursor(3, tft_log_line * 14 + 14);
-    M5Cardputer.Display.print(msg);
-    tft_log_line++;
+    if (tft_log_count == TFT_LOG_MAX) {
+        memmove(tft_log_lines, tft_log_lines + 1,
+                sizeof(tft_log_lines[0]) * (TFT_LOG_MAX - 1));
+        tft_log_count--;
+    }
+    strncpy(tft_log_lines[tft_log_count], msg, TFT_LOG_CHARS);
+    tft_log_lines[tft_log_count][TFT_LOG_CHARS] = '\0';
+    tft_log_count++;
+    redraw_tft_log();
 }
 
 void tft_log_num(const char *msg, unsigned long num) {
-    if (tft_log_line >= TFT_LOG_MAX) return;
-    M5Cardputer.Display.setTextColor(TFT_GREEN, TFT_BLACK);
-    M5Cardputer.Display.setTextSize(1.0);
-    M5Cardputer.Display.setCursor(3, tft_log_line * 14 + 14);
-    M5Cardputer.Display.print(msg);
-    M5Cardputer.Display.print(" ");
-    M5Cardputer.Display.print(num);
-    tft_log_line++;
+    char line[TFT_LOG_CHARS + 1];
+    snprintf(line, sizeof(line), "%s %lu", msg, num);
+    tft_log(line);
 }

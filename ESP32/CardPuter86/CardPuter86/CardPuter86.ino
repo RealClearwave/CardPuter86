@@ -489,13 +489,12 @@ void setup() {
 
     // Initialize TFT display (draws boot log on screen)
     cardputer_display_init();
+    tft_log("Display ready");
+    tft_log("Checking Opt USB request...");
 
     cardputer_storage_enter_usb_mode_if_requested();
 
-    // Continue logging on screen
-    tft_log_num("Heap free:", (unsigned long)ESP.getFreeHeap());
-    tft_log_num("PSRAM:", (unsigned long)ESP.getPsramSize());
-
+    tft_log("Allocating 128 KB emulator RAM...");
     // Reserve the four contiguous emulator RAM banks before filesystems and
     // drivers fragment the remaining heap.
     if (!CreateRAM()) {
@@ -506,6 +505,7 @@ void setup() {
 #endif
         while (true) delay(1000);
     }
+    tft_log("Emulator RAM ready");
     ClearRAM();
     SetRAMTruco();
     bootstrapPoll();

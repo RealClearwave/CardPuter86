@@ -37,7 +37,9 @@ static File sd_image_file;
 static BootImageEntry boot_images[MAX_BOOT_IMAGES];
 static uint8_t boot_image_count = 0;
 
-static USBMSC *usb_msc = nullptr;
+// Construct before TinyUSB starts so MSC is part of the USB descriptor. In
+// normal boot it remains present with no media; USB mode makes it ready.
+static USBMSC usb_msc;
 static CardputerStorageType usb_storage = CARDPUTER_STORAGE_NONE;
 static uint8_t sd_usb_sector[512];
 static wl_handle_t usb_flash_wl = WL_INVALID_HANDLE;
@@ -48,6 +50,19 @@ static bool usb_flash_cache_dirty = false;
 static uint16_t usb_block_size = 512;
 
 CardputerDiskImage gb_disk_image = {};
+
+static void show_probe_status(const char *status) {
+    auto &display = M5Cardputer.Display;
+    display.fillScreen(TFT_BLACK);
+    display.fillRect(0, 0, display.width(), 16, TFT_BLUE);
+    display.setTextSize(1);
+    display.setTextColor(TFT_WHITE, TFT_BLUE);
+    display.setCursor(4, 4);
+    display.print("CardPuter86 storage POST");
+    display.setTextColor(TFT_WHITE, TFT_BLACK);
+    display.setCursor(6, 30);
+    display.print(status);
+}
 
 static bool is_image_name(const char *name) {
     const size_t len = strlen(name);
@@ -367,16 +382,20 @@ bool cardputer_storage_init_and_select(void) {
 
     // Scan one filesystem at a time. Mounting FFat and SD together after the
     // emulator RAM reservation can exhaust or fragment the remaining heap.
+    show_probe_status("Checking internal IMG partition...");
     if (mount_flash()) {
         flash_detected = true;
         scan_flash_images();
         unmount_flash();
     }
+    show_probe_status(flash_detected ? "Internal IMG ready; checking SD..." :
+                                       "Internal IMG failed; checking SD...");
     if (mount_sd()) {
         sd_detected = true;
         scan_sd_images();
         unmount_sd();
     }
+    show_probe_status("Selecting boot image...");
 
 #ifdef use_lib_log_serial
     Serial.printf("Storage: images=%u\n", boot_image_count);
@@ -541,7 +560,7 @@ static int32_t usb_write(uint32_t lba, uint32_t offset, uint8_t *buffer,
 static bool usb_start_stop(uint8_t power_condition, bool start, bool load_eject) {
     (void)power_condition;
     flush_flash_cache();
-    if (usb_msc) usb_msc->mediaPresent(!load_eject || start);
+    usb_msc.mediaPresent(!load_eject || start);
     return true;
 }
 
@@ -578,27 +597,16 @@ static bool start_usb_msc(CardputerStorageType storage) {
                   (unsigned long)sector_count, usb_block_size);
 #endif
 
-    usb_msc = new USBMSC();
-    if (!usb_msc) {
-        if (usb_flash_wl != WL_INVALID_HANDLE) {
-            free(usb_flash_cache);
-            usb_flash_cache = nullptr;
-            wl_unmount(usb_flash_wl);
-            usb_flash_wl = WL_INVALID_HANDLE;
-        }
-        return false;
-    }
-    usb_msc->vendorID("M5Stack");
-    usb_msc->productID(storage == CARDPUTER_STORAGE_SD ?
-                       "CardPuter86 SD" : "CardPuter86 Flash");
-    usb_msc->productRevision("1.0");
-    usb_msc->onStartStop(usb_start_stop);
-    usb_msc->onRead(usb_read);
-    usb_msc->onWrite(usb_write);
-    usb_msc->mediaPresent(true);
-    if (!usb_msc->begin(sector_count, usb_block_size)) {
-        delete usb_msc;
-        usb_msc = nullptr;
+    usb_msc.vendorID("M5Stack");
+    usb_msc.productID(storage == CARDPUTER_STORAGE_SD ?
+                      "CardPuter86 SD" : "CardPuter86 Flash");
+    usb_msc.productRevision("1.0");
+    usb_msc.onStartStop(usb_start_stop);
+    usb_msc.onRead(usb_read);
+    usb_msc.onWrite(usb_write);
+    usb_msc.mediaPresent(true);
+    if (!usb_msc.begin(sector_count, usb_block_size)) {
+        usb_msc.end();
         if (usb_flash_wl != WL_INVALID_HANDLE) {
             free(usb_flash_cache);
             usb_flash_cache = nullptr;
