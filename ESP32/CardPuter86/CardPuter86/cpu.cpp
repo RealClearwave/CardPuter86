@@ -131,6 +131,8 @@ static unsigned char oper1b, oper2b, res8, disp8, temp8, nestlev, addrbyte;
 static unsigned int temp1, temp2, temp3, temp4, temp5, temp32, tempaddr32, ea;
 //static int result;
 uint64_t totalexec;
+static uint8_t bios_midnight_rollover_count = 0;
+static uint16_t bios_last_rtc_day = 0;
 
 //extern uint16_t VGA_SC[0x100], VGA_CRTC[0x100], VGA_ATTR[0x100], VGA_GC[0x100]; //no necesito VGA
 //extern uint8_t updatedscreen;
@@ -275,6 +277,64 @@ void SetRAMTruco()
   case 524288: gb_ram_truco_low= 0x00; gb_ram_truco_high= 0x02; break; //512 KB
   case 655360: gb_ram_truco_low= 0x80; gb_ram_truco_high= 0x02; break; //640 KB
  } 
+} 
+
+static uint32_t rtc_ticks_since_midnight(const CardputerRtcTime &time)
+{
+ const uint32_t seconds = (uint32_t)time.hour * 3600UL +
+                          (uint32_t)time.minute * 60UL +
+                          time.second;
+ // IBM PC BIOS day has 0x1800B0 ticks, i.e. about 18.2065 Hz.
+ return (uint32_t)(((uint64_t)seconds * 0x1800B0ULL) / 86400ULL);
+}
+
+static uint16_t rtc_day_stamp(const CardputerRtcTime &time)
+{
+ return (uint16_t)(time.year * 372U + time.month * 31U + time.day);
+}
+
+static void bios_write_u16(uint32_t address, uint16_t value)
+{
+ write86(address, (uint8_t)(value & 0xFF));
+ write86(address + 1, (uint8_t)(value >> 8));
+}
+
+static void bios_update_clock_data(bool consume_rollover)
+{
+ const CardputerRtcTime time = cardputer_rtc_now();
+ const uint16_t day_stamp = rtc_day_stamp(time);
+ if (bios_last_rtc_day == 0) {
+  bios_last_rtc_day = day_stamp;
+ } else if (day_stamp != bios_last_rtc_day) {
+  if (bios_midnight_rollover_count < 0xFF) bios_midnight_rollover_count++;
+  bios_last_rtc_day = day_stamp;
+ }
+
+ const uint32_t ticks = rtc_ticks_since_midnight(time);
+ bios_write_u16(0x046C, (uint16_t)(ticks & 0xFFFF));
+ bios_write_u16(0x046E, (uint16_t)(ticks >> 16));
+ write86(0x0470, bios_midnight_rollover_count);
+ if (consume_rollover) {
+  bios_midnight_rollover_count = 0;
+  write86(0x0470, 0);
+ }
+}
+
+static void bios_set_clock_ticks(uint32_t ticks)
+{
+ ticks %= 0x1800B0UL;
+ bios_write_u16(0x046C, (uint16_t)(ticks & 0xFFFF));
+ bios_write_u16(0x046E, (uint16_t)(ticks >> 16));
+ write86(0x0470, 0);
+ bios_midnight_rollover_count = 0;
+
+ CardputerRtcTime time = cardputer_rtc_now();
+ const uint32_t seconds = (uint32_t)(((uint64_t)ticks * 86400ULL) / 0x1800B0ULL);
+ time.hour = seconds / 3600;
+ time.minute = (seconds / 60) % 60;
+ time.second = seconds % 60;
+ cardputer_rtc_set(time);
+ bios_last_rtc_day = rtc_day_stamp(time);
 }
 
 //Lo saco fuera de Read86. Se ejecuta al inicio y en timer 54 ms.
@@ -314,6 +374,7 @@ void bootstrapPoll()
 //   gb_ram_bank[0][0x414]= gb_ram_truco_high;
 //  }
  }
+ bios_update_clock_data(false);
 }
 
 #ifdef use_lib_sna_rare
@@ -1933,6 +1994,29 @@ static bool handle_rtc_interrupt(void)
 {
 	CardputerRtcTime now = cardputer_rtc_now();
 	switch (regs.byteregs[regah]) {
+		case 0x00: { // Get BIOS system clock ticks since midnight.
+			bios_update_clock_data(false);
+			const uint32_t ticks = ((uint32_t)readw86(0x046E) << 16) |
+			                       readw86(0x046C);
+			regs.wordregs[regcx] = (uint16_t)(ticks >> 16);
+			regs.wordregs[regdx] = (uint16_t)(ticks & 0xFFFF);
+			regs.byteregs[regal] = read86(0x0470);
+			bios_midnight_rollover_count = 0;
+			write86(0x0470, 0);
+			regs.byteregs[regah] = 0x00;
+			cf = 0;
+			return true;
+		}
+
+		case 0x01: { // Set BIOS system clock ticks since midnight.
+			const uint32_t ticks = ((uint32_t)regs.wordregs[regcx] << 16) |
+			                       regs.wordregs[regdx];
+			bios_set_clock_ticks(ticks);
+			regs.byteregs[regah] = 0x00;
+			cf = 0;
+			return true;
+		}
+
 		case 0x02: // Get RTC time.
 			regs.byteregs[regch] = rtc_to_bcd(now.hour);
 			regs.byteregs[regcl] = rtc_to_bcd(now.minute);
@@ -1957,6 +2041,7 @@ static bool handle_rtc_interrupt(void)
 				rtc_interrupt_error();
 				return true;
 			}
+			bios_update_clock_data(false);
 			regs.byteregs[regah] = 0x00;
 			cf = 0;
 			return true;
@@ -1987,6 +2072,8 @@ static bool handle_rtc_interrupt(void)
 				rtc_interrupt_error();
 				return true;
 			}
+			bios_last_rtc_day = rtc_day_stamp(now);
+			bios_update_clock_data(false);
 			regs.byteregs[regah] = 0x00;
 			cf = 0;
 			return true;

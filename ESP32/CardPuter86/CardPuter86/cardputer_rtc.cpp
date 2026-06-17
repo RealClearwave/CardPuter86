@@ -6,7 +6,7 @@
 #include <sys/time.h>
 #include <time.h>
 
-static const int64_t DEFAULT_EPOCH = 441763200LL; // 1984-01-01 00:00:00 UTC
+static const int64_t DEFAULT_EPOCH = 441763201LL; // 1984-01-01 00:00:01 UTC
 static uint8_t rtc_selected_register = 0;
 
 static bool is_leap(uint16_t year) {
