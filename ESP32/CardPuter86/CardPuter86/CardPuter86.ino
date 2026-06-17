@@ -420,30 +420,6 @@ void handleinput() {
 }
 
 // ===============================================
-// Speaker timer callback (I2S-based)
-// ===============================================
-// Speaker variables defined in cpu.cpp
-extern volatile unsigned int gb_pulsos_onda;
-extern volatile unsigned int gb_cont_my_callbackfunc;
-extern volatile unsigned char speaker_pin_estado;
-
-void my_callback_speaker_func(void) {
-    // Called from timer ISR or polled in loop
-    // I2S output handled via cardputer_speaker
-    if (gb_silence) return;
-
-    if (gb_volumen01 > 0 && gb_frecuencia01 > 0 && gb_pulsos_onda > 0) {
-        gb_cont_my_callbackfunc++;
-        if (gb_cont_my_callbackfunc >= gb_pulsos_onda) {
-            gb_cont_my_callbackfunc = 0;
-            speaker_pin_estado = ~speaker_pin_estado;
-            int16_t sample = speaker_pin_estado ? (gb_volumen01 * 256) : -(gb_volumen01 * 256);
-            cardputer_speaker_write_sample(sample);
-        }
-    }
-}
-
-// ===============================================
 // Main setup
 // ===============================================
 void setup() {
@@ -563,8 +539,6 @@ void loop() {
     gb_cur_vga = millis();
     if ((gb_cur_vga - gb_ini_vga) >= gb_vga_poll_milis) {
         draw();
-        // Speaker timer callback
-        my_callback_speaker_func();
         gb_ini_vga = gb_cur_vga;
     }
 

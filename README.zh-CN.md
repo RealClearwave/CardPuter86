@@ -59,7 +59,7 @@ pio run
 版本号默认读取根目录的 [`VERSION`](VERSION)，也可临时指定：
 
 ```sh
-./flash.sh --package --version 0.2.0
+./flash.sh --package --version 0.3.0
 ```
 
 产物位于 `release/M5Burner/`，包含：
@@ -92,6 +92,12 @@ M5Burner 投稿封面提供 [SVG 矢量版](preview/cardputer86-cover.svg) 和 [
 默认文字模式使用 BSD 许可的 Adafruit Classic 5×7 字形，以 6×8 单元显示 40×16 个字符。缩放模式使用 CC0 许可的 Tom Thumb 3×5 字体显示完整文本屏幕，图形模式则缩放至全屏。
 
 文字视口默认处于 AUTO 模式，自动跟随正文最后一行，并尝试识别和固定底部最多两行状态栏。使用任意 Fn 方向组合后进入 FIXED 模式，不再自动滚动；按 `Fn+空格` 返回 AUTO。
+
+## 音频
+
+PC Speaker 音频由固定在 Core 0 的 FreeRTOS 任务生成，并以 128 个采样为一批写入 I2S DMA。这样 PIT 2 方波不再依赖显示刷新节奏，8086 模拟主循环仍保留在 Arduino 核心。
+
+默认 `cardputer86.img` 根目录包含 `SNDTEST.COM`。在 DOS 下运行它，会通过 PIT 通道 2 和端口 `61h` 播放一段短音阶，用于测试扬声器。
 
 ## 磁盘镜像与启动
 

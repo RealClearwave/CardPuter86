@@ -37,6 +37,10 @@ Las teclas normales del Cardputer corresponden a las teclas del PC. La tecla Aa 
 
 La vista de texto predeterminada usa los [glifos Adafruit Classic 5x7](https://github.com/adafruit/Adafruit-GFX-Library/blob/master/glcdfont.c) con licencia BSD en celdas 6x8. La vista de texto escalada usa [Tom Thumb](https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5) de Robey Pointer, publicada bajo CC0.
 
+## Audio
+
+El PC Speaker se genera en una tarea FreeRTOS fijada al Core 0 y se envia a I2S DMA en bloques de 128 muestras. La imagen predeterminada `cardputer86.img` incluye `SNDTEST.COM`; ejecutelo desde DOS para reproducir una breve prueba por PIT/canal 2 y puerto `61h`.
+
 ## Imagenes de disco
 
 Los archivos `.img` grabables se guardan en una particion FAT independiente de la Flash interna o en la raiz de la microSD. Si hay varias imagenes, un menu de inicio permite elegir cual arrancar. Tambien se aceptan archivos `.dsk` antiguos.
