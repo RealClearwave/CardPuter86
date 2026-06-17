@@ -29,7 +29,7 @@ bool cardputer_input_pressed(CardputerVirtualKey key) {
 }
 
 bool cardputer_input_any_pressed(void) {
-    return M5Cardputer.Keyboard.isPressed() || digitalRead(USER_BTN_PIN) == LOW;
+    return M5Cardputer.Keyboard.isPressed();
 }
 
 uint8_t cardputer_input_function_index(void) {

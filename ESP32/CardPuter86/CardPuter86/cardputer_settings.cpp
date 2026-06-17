@@ -18,7 +18,8 @@ void cardputer_settings_init(void) {
     }
     uint32_t saved_sleep = 120;
     if (nvs_get_u32(handle, "sleep_sec", &saved_sleep) == ESP_OK &&
-        saved_sleep <= 3600) {
+        (saved_sleep == 0 || saved_sleep == 30 || saved_sleep == 120 ||
+         saved_sleep == 300 || saved_sleep == 600)) {
         sleep_timeout_seconds = saved_sleep;
     }
     nvs_close(handle);
@@ -44,7 +45,10 @@ uint32_t cardputer_settings_sleep_timeout_seconds(void) {
 }
 
 bool cardputer_settings_set_sleep_timeout_seconds(uint32_t seconds) {
-    if (seconds > 3600) return false;
+    if (!(seconds == 0 || seconds == 30 || seconds == 120 ||
+          seconds == 300 || seconds == 600)) {
+        return false;
+    }
     sleep_timeout_seconds = seconds;
 
     nvs_handle_t handle;

@@ -79,7 +79,7 @@ The M5Burner submission cover is available as [SVG](preview/cardputer86-cover.sv
 - `Fn` + `'`: return a FIXED viewport to its top-left starting position
 - `Fn` + `Space`: return the text viewport to automatic follow mode
 - `Opt`: switch between the default DSx86-style text mode and scaled mode. Text mode uses a readable 6x8 cell and supports viewport scrolling; scaled mode uses a 3x5 font for text screens and scales graphics screens to the full LCD.
-- `G0`: enter sleep. Press G0 again to wake.
+- `G0`: unused by the emulator power manager.
 
 The default text view uses the BSD-licensed [Adafruit Classic 5x7 glyphs](https://github.com/adafruit/Adafruit-GFX-Library/blob/master/glcdfont.c) in 6x8 cells. The scaled text view uses [Tom Thumb](https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5) by Robey Pointer, released under CC0.
 
@@ -105,7 +105,7 @@ Press `Ctrl` after the SD check to open POST Settings. USB disk mode applies onl
 
 Settings also provides persistent approximate 8086 CPU speed profiles: 4.77 MHz, 8 MHz, 10 MHz, 12 MHz, 16 MHz, 24 MHz, 33 MHz, and Unlimited. POST sound is disabled by default and can be enabled persistently from Settings. The firmware explicitly keeps the ESP32-S3 host CPU at its standard 240 MHz maximum. The CPU limiter models an average of four 8086 clock cycles per emulated instruction; actual software timing remains approximate because instruction costs vary.
 
-Power settings can disable automatic sleep or set it to 1, 2, 5, 10, 30, or 60 minutes. The default is 2 minutes. Sleep currently uses panel-off standby: the LCD panel and backlight are disabled, then any key or G0 restores the display. GPIO0 is the Cardputer Boot strap pin, so G0 cannot be used as a reliable deep-sleep wake source without risking download-mode boot. Settings also includes a simulated RTC clock; DOS reads it through the standard CMOS RTC ports `70h/71h`.
+Power settings can set automatic sleep to 30 seconds, 2 minutes, 5 minutes, 10 minutes, or Never. The default is 2 minutes. Sleep uses ESP32-S3 light sleep with the LCD panel and backlight disabled; the firmware briefly wakes every 100 ms to scan the Cardputer keyboard matrix, and any key restores the display. G0 is not used for sleep or wake. Settings also includes a simulated RTC clock; DOS reads it through the standard CMOS RTC ports `70h/71h`.
 
 `ESP32/CardPuter86/data/cardputer86.img` is used only by `--with-images`. This option resets the internal image partition, so routine firmware updates intentionally do not run `uploadfs`.
 

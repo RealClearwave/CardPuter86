@@ -800,7 +800,10 @@ bool cardputer_storage_enter_usb_mode_if_requested(void) {
                  cardputer_settings_post_sound_enabled() ? "Enabled" : "Disabled");
         const uint32_t sleep_seconds = cardputer_settings_sleep_timeout_seconds();
         if (sleep_seconds == 0) {
-            snprintf(sleep_item, sizeof(sleep_item), "Sleep timeout: Off");
+            snprintf(sleep_item, sizeof(sleep_item), "Sleep timeout: Never");
+        } else if (sleep_seconds < 60) {
+            snprintf(sleep_item, sizeof(sleep_item), "Sleep timeout: %lu sec",
+                     (unsigned long)sleep_seconds);
         } else {
             snprintf(sleep_item, sizeof(sleep_item), "Sleep timeout: %lu min",
                      (unsigned long)(sleep_seconds / 60));
@@ -847,19 +850,18 @@ bool cardputer_storage_enter_usb_mode_if_requested(void) {
         }
         if (choice == 4) {
             const char *sleep_profiles[] = {
-                "Off", "1 minute", "2 minutes", "5 minutes", "10 minutes",
-                "30 minutes", "60 minutes"
+                "30 seconds", "2 minutes", "5 minutes", "10 minutes", "Never"
             };
-            const uint32_t sleep_values[] = {0, 60, 120, 300, 600, 1800, 3600};
-            uint8_t selected = 2;
-            for (uint8_t i = 0; i < 7; i++) {
+            const uint32_t sleep_values[] = {30, 120, 300, 600, 0};
+            uint8_t selected = 1;
+            for (uint8_t i = 0; i < 5; i++) {
                 if (sleep_values[i] == cardputer_settings_sleep_timeout_seconds()) {
                     selected = i;
                     break;
                 }
             }
             const uint8_t profile = choose_menu(
-                "Sleep timeout", sleep_profiles, 7, selected, false);
+                "Sleep timeout", sleep_profiles, 5, selected, false);
             if (!cardputer_settings_set_sleep_timeout_seconds(sleep_values[profile])) {
                 show_probe_status("Sleep setting failed", "NVS write error");
                 delay(1500);
