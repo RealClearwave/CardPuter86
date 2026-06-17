@@ -328,24 +328,6 @@ bool cardputer_modem_wifi_connected(void) {
     return WiFi.status() == WL_CONNECTED;
 }
 
-int cardputer_modem_scan_networks(CardputerWifiNetwork *networks, uint8_t max_networks) {
-    if (!networks || max_networks == 0) return 0;
-    WiFi.mode(WIFI_STA);
-    WiFi.disconnect(false);
-    const int found = WiFi.scanNetworks(false, true);
-    if (found <= 0) return found;
-    const int count = found < max_networks ? found : max_networks;
-    for (int i = 0; i < count; i++) {
-        String ssid = WiFi.SSID(i);
-        strncpy(networks[i].ssid, ssid.c_str(), sizeof(networks[i].ssid));
-        networks[i].ssid[sizeof(networks[i].ssid) - 1] = 0;
-        networks[i].rssi = WiFi.RSSI(i);
-        networks[i].encrypted = WiFi.encryptionType(i) != WIFI_AUTH_OPEN;
-    }
-    WiFi.scanDelete();
-    return count;
-}
-
 void cardputer_modem_install_bda(void) {
     write86(0x400, COM1_BASE & 0xFF);
     write86(0x401, COM1_BASE >> 8);

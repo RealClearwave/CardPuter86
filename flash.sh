@@ -97,8 +97,7 @@ echo ""
 
 ESPTOOL="$(find "$HOME/.platformio/packages/tool-esptoolpy" -maxdepth 1 -type f -name 'esptool.py' | head -n 1 || true)"
 FATFS_IMAGE="$PROJECT_DIR/.pio/build/$PIO_ENV/fatfs.bin"
-FATFS_OFFSET="0x2A0000"
-FATFS_PACKAGE_SIZE=$((0x560000))
+FATFS_OFFSET="0x2A1000"
 
 if [[ "$PACKAGE" == true ]]; then
     BUILD_DIR="$PROJECT_DIR/.pio/build/$PIO_ENV"
@@ -123,9 +122,7 @@ if [[ "$PACKAGE" == true ]]; then
     cp "$BOOTLOADER" "$PACKAGE_DIR/bootloader_0x0000.bin"
     cp "$PARTITIONS" "$PACKAGE_DIR/partitions_0x8000.bin"
     cp "$FIRMWARE" "$PACKAGE_DIR/CardPuter86_0x10000.bin"
-    FATFS_PACKAGE_IMAGE="$PACKAGE_DIR/fatfs_0x2A0000.bin"
-    cp "$FATFS_IMAGE" "$FATFS_PACKAGE_IMAGE"
-    truncate -s "$FATFS_PACKAGE_SIZE" "$FATFS_PACKAGE_IMAGE"
+    cp "$FATFS_IMAGE" "$PACKAGE_DIR/fatfs_0x2A1000.bin"
     cp "$SCRIPT_DIR/preview/cardputer86-cover.svg" "$PACKAGE_DIR/cover.svg"
     cp "$SCRIPT_DIR/preview/cardputer86-cover.png" "$PACKAGE_DIR/cover.png"
 
@@ -135,7 +132,7 @@ if [[ "$PACKAGE" == true ]]; then
         0x0 "$BOOTLOADER" \
         0x8000 "$PARTITIONS" \
         0x10000 "$FIRMWARE" \
-        "$FATFS_OFFSET" "$FATFS_PACKAGE_IMAGE"
+        "$FATFS_OFFSET" "$FATFS_IMAGE"
 
     cat > "$PACKAGE_DIR/m5burner.json" <<EOF
 {
@@ -165,7 +162,7 @@ CardPuter86 $RELEASE_VERSION - ESP32-S3 8 MB QIO
 0x000000  bootloader_0x0000.bin
 0x008000  partitions_0x8000.bin
 0x010000  CardPuter86_0x10000.bin
-0x2A0000  fatfs_0x2A0000.bin
+0x2A1000  fatfs_0x2A1000.bin
 
 For M5Burner v3 User Custom, import CardPuter86_${RELEASE_VERSION}_full_8MB.bin
 and flash it at address 0x000000 with the entire flash erased.
