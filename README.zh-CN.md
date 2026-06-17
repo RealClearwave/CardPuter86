@@ -59,7 +59,7 @@ pio run
 版本号默认读取根目录的 [`VERSION`](VERSION)，也可临时指定：
 
 ```sh
-./flash.sh --package --version 0.3.6
+./flash.sh --package --version 0.3.5
 ```
 
 产物位于 `release/M5Burner/`，包含：
@@ -98,22 +98,6 @@ M5Burner 投稿封面提供 [SVG 矢量版](preview/cardputer86-cover.svg) 和 [
 PC Speaker 音频由固定在 Core 0 的 FreeRTOS 任务生成，并以 128 个立体声帧为一批写入 I2S DMA。这样 PIT 2 方波不再依赖显示刷新节奏，8086 模拟主循环仍保留在 Arduino 核心。
 
 默认 `cardputer86.img` 根目录包含 `SNDTEST.COM`。在 DOS 下运行它，会通过 PIT 通道 2 和端口 `61h` 播放一段短音阶，用于测试扬声器。
-
-## Wi-Fi 虚拟 Modem
-
-CardPuter86 在 `COM1`（`0x3F8`）提供 Hayes 风格虚拟调制解调器。DOS 软件看到的是近似 8250 的串口，ESP32-S3 负责 Wi-Fi 和 TCP。
-
-Wi-Fi 的 SSID/密码在 POST Settings 里配置：SD 检查后按住 `Ctrl`，进入 `Wi-Fi modem`。凭据会保存到 NVS。进入 DOS 后可运行 `MODEM.COM` 测试 COM1；它会发送 `AT`，正常应显示回显的 `AT` 和 `OK`。
-
-在 DOS 终端软件中可使用：
-
-```text
-AT
-ATDT telehack.com:23
-ATH
-```
-
-该功能面向 Telnet、BBS、MUD 和简单串口程序，不是 packet driver，也不是完整 DOS TCP/IP 栈。
 
 ## 磁盘镜像与启动
 

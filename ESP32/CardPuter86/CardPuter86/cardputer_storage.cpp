@@ -3,7 +3,6 @@
 #include "guest_memory.h"
 #include "cardputer_cpu.h"
 #include "cardputer_settings.h"
-#include "cardputer_modem.h"
 #include <Arduino.h>
 #include <M5Cardputer.h>
 #include <SD.h>
@@ -379,129 +378,6 @@ static uint8_t choose_menu(const char *title, const char *const *items,
         previous_down = down;
         previous_enter = enter;
         delay(15);
-    }
-}
-
-static bool text_input(const char *title, const char *hint, char *buffer,
-                       size_t buffer_size, bool masked) {
-    if (buffer_size == 0) return false;
-    do {
-        M5Cardputer.update();
-        if (!M5Cardputer.Keyboard.isPressed()) break;
-        delay(10);
-    } while (true);
-
-    size_t len = strnlen(buffer, buffer_size);
-    bool redraw = true;
-    while (true) {
-        if (redraw) {
-            auto &display = M5Cardputer.Display;
-            display.fillScreen(TFT_BLACK);
-            display.fillRect(0, 0, display.width(), 16, TFT_BLUE);
-            display.setTextSize(1);
-            display.setTextColor(TFT_WHITE, TFT_BLUE);
-            display.setCursor(4, 4);
-            display.print(title);
-            display.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-            display.setCursor(6, 24);
-            display.print(hint);
-            display.drawRect(5, 48, display.width() - 10, 18, TFT_DARKGREY);
-            display.setCursor(9, 53);
-            display.setTextColor(TFT_WHITE, TFT_BLACK);
-            if (masked) {
-                for (size_t i = 0; i < len && i < 36; i++) display.print('*');
-            } else {
-                const size_t start = len > 36 ? len - 36 : 0;
-                display.print(buffer + start);
-            }
-            display.fillRect(0, display.height() - 10, display.width(), 10, TFT_NAVY);
-            display.setTextColor(TFT_WHITE, TFT_NAVY);
-            display.setCursor(3, display.height() - 9);
-            display.print("Enter=save  Esc/Ctrl=cancel  Del=back");
-            redraw = false;
-        }
-
-        M5Cardputer.update();
-        if (M5Cardputer.Keyboard.isChange() && M5Cardputer.Keyboard.isPressed()) {
-            auto state = M5Cardputer.Keyboard.keysState();
-            if (state.ctrl || M5Cardputer.Keyboard.isKeyPressed('`')) return false;
-            if (state.enter) {
-                buffer[len] = 0;
-                return true;
-            }
-            if (state.del) {
-                if (len > 0) buffer[--len] = 0;
-                redraw = true;
-            } else {
-                for (char c : state.word) {
-                    if (c >= 32 && c <= 126 && len + 1 < buffer_size) {
-                        buffer[len++] = c;
-                        buffer[len] = 0;
-                    }
-                }
-                redraw = true;
-            }
-        }
-        delay(15);
-    }
-}
-
-static void show_wifi_modem_menu(void) {
-    while (true) {
-        char ssid_item[48];
-        char pass_item[32];
-        char status_item[32];
-        snprintf(ssid_item, sizeof(ssid_item), "SSID: %.34s",
-                 cardputer_modem_ssid()[0] ? cardputer_modem_ssid() : "(not set)");
-        snprintf(pass_item, sizeof(pass_item), "Password: %s",
-                 cardputer_modem_has_password() ? "set" : "(empty)");
-        snprintf(status_item, sizeof(status_item), "Wi-Fi: %s",
-                 cardputer_modem_wifi_connected() ? "connected" : "disconnected");
-        const char *items[] = {
-            ssid_item, pass_item, "Connect saved Wi-Fi", status_item,
-            "Clear Wi-Fi settings", "Back"
-        };
-        const uint8_t choice = choose_menu("Wi-Fi Hayes modem", items, 6, 0, false);
-        if (choice == 0) {
-            char ssid[33];
-            strncpy(ssid, cardputer_modem_ssid(), sizeof(ssid));
-            ssid[sizeof(ssid) - 1] = 0;
-            if (text_input("Wi-Fi SSID", "Printable ASCII, max 32 chars",
-                           ssid, sizeof(ssid), false)) {
-                if (!cardputer_modem_set_ssid(ssid)) {
-                    show_probe_status("Wi-Fi SSID failed", "NVS write error");
-                    delay(1500);
-                }
-            }
-            continue;
-        }
-        if (choice == 1) {
-            char pass[65] = {};
-            if (text_input("Wi-Fi password", "Printable ASCII, max 64 chars",
-                           pass, sizeof(pass), true)) {
-                if (!cardputer_modem_set_password(pass)) {
-                    show_probe_status("Wi-Fi password failed", "NVS write error");
-                    delay(1500);
-                }
-            }
-            continue;
-        }
-        if (choice == 2) {
-            show_probe_status("Connecting Wi-Fi...", cardputer_modem_ssid());
-            const bool ok = cardputer_modem_connect_saved(15000);
-            show_probe_status(ok ? "Wi-Fi connected" : "Wi-Fi connect failed",
-                              ok ? "COM1 modem ready" : "Check SSID/password");
-            delay(1500);
-            continue;
-        }
-        if (choice == 4) {
-            if (!cardputer_modem_clear_wifi()) {
-                show_probe_status("Clear Wi-Fi failed", "NVS write error");
-                delay(1500);
-            }
-            continue;
-        }
-        if (choice == 5) return;
     }
 }
 
@@ -912,21 +788,17 @@ bool cardputer_storage_enter_usb_mode_if_requested(void) {
         char ram_item[32];
         char cpu_item[32];
         char sound_item[32];
-        char modem_item[48];
         snprintf(ram_item, sizeof(ram_item), "512 KB memory: %s",
                  guest_memory_512k_enabled() ? "Enabled" : "Disabled");
         snprintf(cpu_item, sizeof(cpu_item), "CPU speed: %s",
                  cardputer_cpu_profile_label(cardputer_cpu_profile()));
         snprintf(sound_item, sizeof(sound_item), "POST sound: %s",
                  cardputer_settings_post_sound_enabled() ? "Enabled" : "Disabled");
-        snprintf(modem_item, sizeof(modem_item), "Wi-Fi modem: %.28s",
-                 cardputer_modem_ssid()[0] ? cardputer_modem_ssid() : "(not set)");
         const char *items[] = {
-            "USB disk mode", ram_item, cpu_item, sound_item, modem_item,
-            "Continue boot"
+            "USB disk mode", ram_item, cpu_item, sound_item, "Continue boot"
         };
         const uint8_t choice = choose_menu(
-            "CardPuter86 Settings", items, 6, 0, false);
+            "CardPuter86 Settings", items, 5, 0, false);
         if (choice == 0) return start_selected_usb_mode();
         if (choice == 1) {
             const bool enable = !guest_memory_512k_enabled();
@@ -956,10 +828,6 @@ bool cardputer_storage_enter_usb_mode_if_requested(void) {
                 show_probe_status("POST sound failed", "NVS write error");
                 delay(1500);
             }
-            continue;
-        }
-        if (choice == 4) {
-            show_wifi_modem_menu();
             continue;
         }
         return false;
