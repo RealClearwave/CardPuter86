@@ -25,6 +25,7 @@
 #include "gbGlobals.h"
 #include "cpu.h"
 #include "ports.h"
+#include "cardputer_rtc.h"
 
 //Lista puertos
 //0x60 teclado
@@ -98,6 +99,9 @@ void portout (uint16_t portnum, uint8_t value)
 	
 	//printf("portout(0x%X, 0x%02X);\n", portnum, value);
 	switch (portnum) {
+            case 0x70:
+                cardputer_rtc_select_register(value);
+                return;
 			case 0x61:
 				//if ( (value & 3) == 3) speakerenabled = 1;
 				//else speakerenabled = 0;
@@ -146,6 +150,8 @@ uint8_t portin (uint16_t portnum)
   return 0;
 	//printf("portin(0x%X);\n", portnum);
 	switch (portnum) {
+            case 0x71:
+                return cardputer_rtc_read_selected();
 			case 0x62:
 				return (0x00);
 			case 0x60:

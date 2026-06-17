@@ -73,13 +73,13 @@ The M5Burner submission cover is available as [SVG](preview/cardputer86-cover.sv
 - `Fn` + `=`: F12
 - `Fn` + `` ` ``: Esc
 - `Fn` + `Backspace`: Delete
-- `Aa`: Shift
+- `Aa`: Shift. `Aa` + `` `1234567890-= `` sends `~!@#$%^&*()_+`.
 - `Ctrl`, `Alt`: corresponding PC modifier keys
-- `Fn` + `;`, `.`, `,`, `/`: scroll the 40x16 text viewport up, down, left, and right
+- `Fn` + `;`, `,`, `.`, `/`: PC cursor Up, Left, Down, and Right. In text viewport navigation these also scroll the 40x16 view.
 - `Fn` + `'`: return a FIXED viewport to its top-left starting position
 - `Fn` + `Space`: return the text viewport to automatic follow mode
 - `Opt`: switch between the default DSx86-style text mode and scaled mode. Text mode uses a readable 6x8 cell and supports viewport scrolling; scaled mode uses a 3x5 font for text screens and scales graphics screens to the full LCD.
-- `G0`: reserved
+- `G0`: enter deep sleep. Press G0 again to wake and reboot.
 
 The default text view uses the BSD-licensed [Adafruit Classic 5x7 glyphs](https://github.com/adafruit/Adafruit-GFX-Library/blob/master/glcdfont.c) in 6x8 cells. The scaled text view uses [Tom Thumb](https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5) by Robey Pointer, released under CC0.
 
@@ -104,6 +104,8 @@ To import images from a computer, wait for the optional SD check and hold `Ctrl`
 Press `Ctrl` after the SD check to open POST Settings. USB disk mode applies only to the current boot. The 512 KB memory option is stored in NVS and remains selected after power-off; when disabled or unset, the emulated PC uses the default 128 KB. In 512 KB mode, a 128 KB SRAM page cache keeps active 4 KB pages in memory while cold dirty pages are written through ESP-IDF wear levelling to a dedicated Flash partition.
 
 Settings also provides persistent approximate 8086 CPU speed profiles: 4.77 MHz, 8 MHz, 10 MHz, 12 MHz, 16 MHz, 24 MHz, 33 MHz, and Unlimited. POST sound is disabled by default and can be enabled persistently from Settings. The firmware explicitly keeps the ESP32-S3 host CPU at its standard 240 MHz maximum. The CPU limiter models an average of four 8086 clock cycles per emulated instruction; actual software timing remains approximate because instruction costs vary.
+
+Power settings can disable automatic sleep or set it to 1, 2, 5, 10, 30, or 60 minutes. The default is 2 minutes. Sleep uses ESP32-S3 deep sleep with the G0 RTC GPIO as wake source; keyboard-matrix wake is intentionally not enabled because continuously scanning it from ULP would cost more standby power. Settings also includes a simulated RTC clock; DOS reads it through the standard CMOS RTC ports `70h/71h`.
 
 `ESP32/CardPuter86/data/cardputer86.img` is used only by `--with-images`. This option resets the internal image partition, so routine firmware updates intentionally do not run `uploadfs`.
 

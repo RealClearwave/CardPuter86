@@ -4,6 +4,7 @@
 #include "gbGlobals.h"
 #include "TomThumb3x5.h"
 #include <M5Cardputer.h>
+#include "cardputer_input.h"
 #include <lgfx/Fonts/glcdfont.h>
 
 // ===============================================
@@ -402,17 +403,18 @@ void cardputer_display_update_mode_button(void) {
     opt_was_pressed = opt_pressed;
 
     const bool navigation_active = cardputer_display_navigation_active();
-    const bool up_pressed = navigation_active && state.fn &&
-        M5Cardputer.Keyboard.isKeyPressed(';');
-    const bool down_pressed = navigation_active && state.fn &&
-        M5Cardputer.Keyboard.isKeyPressed('.');
-    const bool left_pressed = navigation_active && state.fn &&
-        M5Cardputer.Keyboard.isKeyPressed(',');
-    const bool right_pressed = navigation_active && state.fn &&
-        M5Cardputer.Keyboard.isKeyPressed('/');
-    const bool auto_pressed = navigation_active && state.fn && state.space;
-    const bool home_pressed = navigation_active && state.fn &&
-        M5Cardputer.Keyboard.isKeyPressed('\'');
+    const bool up_pressed = navigation_active &&
+        cardputer_input_pressed(CARDPUTER_VK_UP);
+    const bool down_pressed = navigation_active &&
+        cardputer_input_pressed(CARDPUTER_VK_DOWN);
+    const bool left_pressed = navigation_active &&
+        cardputer_input_pressed(CARDPUTER_VK_LEFT);
+    const bool right_pressed = navigation_active &&
+        cardputer_input_pressed(CARDPUTER_VK_RIGHT);
+    const bool auto_pressed = navigation_active &&
+        cardputer_input_pressed(CARDPUTER_VK_AUTO);
+    const bool home_pressed = navigation_active &&
+        cardputer_input_pressed(CARDPUTER_VK_HOME);
 
     const int source_cols = cols > 80 ? 80 : cols;
     const int source_rows = rows > 25 ? 25 : rows;

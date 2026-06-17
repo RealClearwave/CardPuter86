@@ -27,10 +27,13 @@
 
 // Cardputer drivers
 #include "cardputer_display.h"
+#include "cardputer_input.h"
 #include "cardputer_kbd.h"
 #include "cardputer_speaker.h"
 #include "cardputer_storage.h"
 #include "cardputer_cpu.h"
+#include "cardputer_power.h"
+#include "cardputer_rtc.h"
 #include "cardputer_settings.h"
 #include "guest_memory.h"
 
@@ -456,6 +459,8 @@ void setup() {
 
     cardputer_cpu_init();
     cardputer_settings_init();
+    cardputer_rtc_init();
+    cardputer_power_init();
 
     // Probe storage, show Settings when Ctrl is pressed, then select the IMG.
     // Settings may change the effective guest RAM size for this boot.
@@ -531,8 +536,12 @@ void loop() {
 
         // Scan Cardputer keyboard matrix
         cardputer_update();
+        if (cardputer_input_any_pressed()) {
+            cardputer_power_note_activity();
+        }
         cardputer_display_update_mode_button();
         cardputer_kbd_fill_keymap();
+        cardputer_power_poll();
 
         handleinput();
         ProcesarAcciones();

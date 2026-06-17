@@ -2,6 +2,8 @@
 #include "hardware.h"
 #include "guest_memory.h"
 #include "cardputer_cpu.h"
+#include "cardputer_input.h"
+#include "cardputer_rtc.h"
 #include "cardputer_settings.h"
 #include <Arduino.h>
 #include <M5Cardputer.h>
@@ -343,9 +345,9 @@ static uint8_t choose_menu(const char *title, const char *const *items,
         M5Cardputer.update();
         auto state = M5Cardputer.Keyboard.keysState();
         const bool up = M5Cardputer.Keyboard.isKeyPressed('w') ||
-                        M5Cardputer.Keyboard.isKeyPressed(';');
+                        cardputer_input_pressed(CARDPUTER_VK_UP);
         const bool down = M5Cardputer.Keyboard.isKeyPressed('s') ||
-                          M5Cardputer.Keyboard.isKeyPressed('.');
+                          cardputer_input_pressed(CARDPUTER_VK_DOWN);
         bool enter = state.enter;
 
         if (up && !previous_up) {
@@ -788,17 +790,30 @@ bool cardputer_storage_enter_usb_mode_if_requested(void) {
         char ram_item[32];
         char cpu_item[32];
         char sound_item[32];
+        char sleep_item[32];
+        char rtc_item[40];
         snprintf(ram_item, sizeof(ram_item), "512 KB memory: %s",
                  guest_memory_512k_enabled() ? "Enabled" : "Disabled");
         snprintf(cpu_item, sizeof(cpu_item), "CPU speed: %s",
                  cardputer_cpu_profile_label(cardputer_cpu_profile()));
         snprintf(sound_item, sizeof(sound_item), "POST sound: %s",
                  cardputer_settings_post_sound_enabled() ? "Enabled" : "Disabled");
+        const uint32_t sleep_seconds = cardputer_settings_sleep_timeout_seconds();
+        if (sleep_seconds == 0) {
+            snprintf(sleep_item, sizeof(sleep_item), "Sleep timeout: Off");
+        } else {
+            snprintf(sleep_item, sizeof(sleep_item), "Sleep timeout: %lu min",
+                     (unsigned long)(sleep_seconds / 60));
+        }
+        char rtc_text[24];
+        cardputer_rtc_format(cardputer_rtc_now(), rtc_text, sizeof(rtc_text));
+        snprintf(rtc_item, sizeof(rtc_item), "RTC: %.20s", rtc_text);
         const char *items[] = {
-            "USB disk mode", ram_item, cpu_item, sound_item, "Continue boot"
+            "USB disk mode", ram_item, cpu_item, sound_item,
+            sleep_item, rtc_item, "Continue boot"
         };
         const uint8_t choice = choose_menu(
-            "CardPuter86 Settings", items, 5, 0, false);
+            "CardPuter86 Settings", items, 7, 0, false);
         if (choice == 0) return start_selected_usb_mode();
         if (choice == 1) {
             const bool enable = !guest_memory_512k_enabled();
@@ -827,6 +842,79 @@ bool cardputer_storage_enter_usb_mode_if_requested(void) {
             if (!cardputer_settings_set_post_sound_enabled(enable)) {
                 show_probe_status("POST sound failed", "NVS write error");
                 delay(1500);
+            }
+            continue;
+        }
+        if (choice == 4) {
+            const char *sleep_profiles[] = {
+                "Off", "1 minute", "2 minutes", "5 minutes", "10 minutes",
+                "30 minutes", "60 minutes"
+            };
+            const uint32_t sleep_values[] = {0, 60, 120, 300, 600, 1800, 3600};
+            uint8_t selected = 2;
+            for (uint8_t i = 0; i < 7; i++) {
+                if (sleep_values[i] == cardputer_settings_sleep_timeout_seconds()) {
+                    selected = i;
+                    break;
+                }
+            }
+            const uint8_t profile = choose_menu(
+                "Sleep timeout", sleep_profiles, 7, selected, false);
+            if (!cardputer_settings_set_sleep_timeout_seconds(sleep_values[profile])) {
+                show_probe_status("Sleep setting failed", "NVS write error");
+                delay(1500);
+            }
+            continue;
+        }
+        if (choice == 5) {
+            char input[15] = {};
+            uint8_t pos = 0;
+            bool previous_enter = false;
+            bool previous_del = false;
+            while (true) {
+                auto &display = M5Cardputer.Display;
+                display.fillScreen(TFT_BLACK);
+                display.fillRect(0, 0, display.width(), 16, TFT_BLUE);
+                display.setTextColor(TFT_WHITE, TFT_BLUE);
+                display.setCursor(4, 4);
+                display.print("Set RTC");
+                display.setTextColor(TFT_WHITE, TFT_BLACK);
+                display.setCursor(6, 30);
+                display.print("YYYYMMDDhhmmss");
+                display.setCursor(6, 48);
+                display.print(input);
+                display.setTextColor(TFT_YELLOW, TFT_BLACK);
+                display.setCursor(6, 70);
+                display.print("Enter=save Backspace=del");
+                display.setCursor(6, 84);
+                display.print("Esc=cancel");
+
+                M5Cardputer.update();
+                const auto state = M5Cardputer.Keyboard.keysState();
+                for (char c : state.word) {
+                    if (c >= '0' && c <= '9' && pos < 14) {
+                        input[pos++] = c;
+                        input[pos] = '\0';
+                    }
+                }
+                if (state.del && !previous_del && pos > 0) {
+                    input[--pos] = '\0';
+                }
+                if (cardputer_input_pressed(CARDPUTER_VK_ESC)) break;
+                if (state.enter && !previous_enter) {
+                    CardputerRtcTime rtc_time;
+                    if (cardputer_rtc_parse_yyyymmddhhmmss(input, &rtc_time) &&
+                        cardputer_rtc_set(rtc_time)) {
+                        show_probe_status("RTC updated", input);
+                    } else {
+                        show_probe_status("RTC update failed", "Use YYYYMMDDhhmmss");
+                    }
+                    delay(1500);
+                    break;
+                }
+                previous_enter = state.enter;
+                previous_del = state.del;
+                delay(80);
             }
             continue;
         }
