@@ -21,13 +21,13 @@ static uint64_t slot_age[CACHE_PAGE_COUNT];
 static bool slot_dirty[CACHE_PAGE_COUNT];
 static uint8_t swap_valid[(GUEST_PAGE_COUNT + 7) / 8];
 static uint64_t access_clock = 0;
-static bool mode_512k = true;
+static bool mode_512k = false;
 
 static bool load_512k_setting(void) {
-    if (nvs_flash_init() != ESP_OK) return true;
+    if (nvs_flash_init() != ESP_OK) return false;
     nvs_handle_t handle;
-    if (nvs_open("cardputer86", NVS_READONLY, &handle) != ESP_OK) return true;
-    uint8_t enabled = 1;
+    if (nvs_open("cardputer86", NVS_READONLY, &handle) != ESP_OK) return false;
+    uint8_t enabled = 0;
     nvs_get_u8(handle, "ram512", &enabled);
     nvs_close(handle);
     return enabled != 0;

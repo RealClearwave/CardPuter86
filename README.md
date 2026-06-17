@@ -101,7 +101,7 @@ When more than one image is available, startup shows a boot menu. Use `W`/`S` (o
 
 To import images from a computer, wait for the optional SD check and hold `Ctrl` when it finishes. If SD was enabled with `Alt` and detected, select either `Internal Flash` or `SD Card`; otherwise the internal Flash is exported automatically as a USB drive. Copy `.img` files to its root, safely eject it, and reboot.
 
-Press `Ctrl` after the SD check to open POST Settings. USB disk mode applies only to the current boot. The 512 KB memory option is stored in NVS and remains selected after power-off; when disabled, the emulated PC uses 128 KB. In 512 KB mode, a 128 KB SRAM page cache keeps active 4 KB pages in memory while cold dirty pages are written through ESP-IDF wear levelling to a dedicated Flash partition.
+Press `Ctrl` after the SD check to open POST Settings. USB disk mode applies only to the current boot. The 512 KB memory option is stored in NVS and remains selected after power-off; when disabled or unset, the emulated PC uses the default 128 KB. In 512 KB mode, a 128 KB SRAM page cache keeps active 4 KB pages in memory while cold dirty pages are written through ESP-IDF wear levelling to a dedicated Flash partition.
 
 Settings also provides persistent approximate 8086 CPU speed profiles: 4.77 MHz, 8 MHz, 10 MHz, 12 MHz, and Unlimited. The limiter models an average of four 8086 clock cycles per emulated instruction; actual software timing remains approximate because instruction costs vary.
 

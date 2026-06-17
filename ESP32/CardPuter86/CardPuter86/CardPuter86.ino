@@ -470,6 +470,7 @@ void setup() {
 
     // Initialize I2S speaker
     cardputer_speaker_init();
+    cardputer_speaker_self_test();
 
     // BIOS data area: number of installed hard disks.
     if (gb_disk_image.mounted && gb_disk_image.drive == 0x80) {

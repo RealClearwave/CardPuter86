@@ -11,6 +11,7 @@ extern "C" {
 void cardputer_speaker_init(void);
 void cardputer_speaker_write_sample(int16_t sample);
 void cardputer_speaker_mute(void);
+void cardputer_speaker_self_test(void);
 bool cardputer_speaker_task_running(void);
 
 #ifdef __cplusplus

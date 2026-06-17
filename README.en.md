@@ -47,7 +47,7 @@ Writable `.img` files live in an independent FAT partition in internal Flash or 
 
 After the optional SD check, hold `Ctrl` to enter USB storage mode. If SD was enabled with `Alt` and detected, choose internal Flash or SD; otherwise internal Flash is exported automatically. Copy IMG files, safely eject the drive, and reboot.
 
-Press `Ctrl` after the SD check to open POST Settings. USB disk mode applies only to the current boot. The 512 KB memory option is stored in NVS across power cycles; when disabled, the emulated PC uses 128 KB. In 512 KB mode, active 4 KB pages use a 128 KB SRAM cache and cold dirty pages use a dedicated wear-levelled Flash partition.
+Press `Ctrl` after the SD check to open POST Settings. USB disk mode applies only to the current boot. The 512 KB memory option is stored in NVS across power cycles; when disabled or unset, the emulated PC uses the default 128 KB. In 512 KB mode, active 4 KB pages use a 128 KB SRAM cache and cold dirty pages use a dedicated wear-levelled Flash partition.
 
 Settings also stores an approximate 8086 CPU speed profile: 4.77 MHz, 8 MHz, 10 MHz, 12 MHz, or Unlimited. Limited profiles use an average four-clock-per-instruction timing model, so exact speed varies with the instruction mix.
 

@@ -21,6 +21,7 @@
 
 static bool i2s_initialized = false;
 static TaskHandle_t audio_task_handle = nullptr;
+static volatile bool direct_output_active = false;
 
 static int16_t speaker_sample_from_phase(uint32_t *phase) {
     const int volume = gb_silence ? 0 : gb_volumen01;
@@ -43,6 +44,11 @@ static void audio_task(void *parameter) {
     uint32_t phase = 0;
 
     while (true) {
+        if (direct_output_active) {
+            vTaskDelay(pdMS_TO_TICKS(5));
+            continue;
+        }
+
         for (size_t i = 0; i < AUDIO_BUFFER_FRAMES; i++) {
             const int16_t sample = speaker_sample_from_phase(&phase);
             samples[i * 2] = sample;
@@ -129,6 +135,47 @@ void cardputer_speaker_mute(void) {
         size_t written;
         i2s_write(I2S_PORT, zero, sizeof(zero), &written, 0);
     }
+}
+
+static void write_direct_tone(uint16_t frequency, uint16_t duration_ms) {
+    int16_t frames[AUDIO_BUFFER_FRAMES * 2];
+    uint32_t phase = 0;
+    const uint32_t step =
+        (uint32_t)(((uint64_t)frequency << 32) / SAMPLE_RATE);
+    const uint32_t total_frames =
+        ((uint32_t)SAMPLE_RATE * duration_ms) / 1000;
+    uint32_t frames_written = 0;
+
+    while (frames_written < total_frames) {
+        const uint32_t batch_frames =
+            min((uint32_t)AUDIO_BUFFER_FRAMES, total_frames - frames_written);
+        for (uint32_t i = 0; i < batch_frames; i++) {
+            phase += step;
+            const int16_t sample = (phase & 0x80000000UL) ? 18000 : -18000;
+            frames[i * 2] = sample;
+            frames[i * 2 + 1] = sample;
+        }
+
+        size_t bytes_written = 0;
+        i2s_write(I2S_PORT, frames, batch_frames * 2 * sizeof(int16_t),
+                  &bytes_written, portMAX_DELAY);
+        frames_written += batch_frames;
+    }
+}
+
+void cardputer_speaker_self_test(void) {
+    if (!i2s_initialized) return;
+
+    direct_output_active = true;
+    vTaskDelay(pdMS_TO_TICKS(20));
+    i2s_zero_dma_buffer(I2S_PORT);
+
+    write_direct_tone(440, 160);
+    write_direct_tone(660, 160);
+    write_direct_tone(880, 160);
+    cardputer_speaker_mute();
+
+    direct_output_active = false;
 }
 
 bool cardputer_speaker_task_running(void) {
