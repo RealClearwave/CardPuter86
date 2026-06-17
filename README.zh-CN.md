@@ -59,7 +59,7 @@ pio run
 版本号默认读取根目录的 [`VERSION`](VERSION)，也可临时指定：
 
 ```sh
-./flash.sh --package --version 0.3.0
+./flash.sh --package --version 0.3.1
 ```
 
 产物位于 `release/M5Burner/`，包含：
@@ -95,7 +95,7 @@ M5Burner 投稿封面提供 [SVG 矢量版](preview/cardputer86-cover.svg) 和 [
 
 ## 音频
 
-PC Speaker 音频由固定在 Core 0 的 FreeRTOS 任务生成，并以 128 个采样为一批写入 I2S DMA。这样 PIT 2 方波不再依赖显示刷新节奏，8086 模拟主循环仍保留在 Arduino 核心。
+PC Speaker 音频由固定在 Core 0 的 FreeRTOS 任务生成，并以 128 个立体声帧为一批写入 I2S DMA。这样 PIT 2 方波不再依赖显示刷新节奏，8086 模拟主循环仍保留在 Arduino 核心。
 
 默认 `cardputer86.img` 根目录包含 `SNDTEST.COM`。在 DOS 下运行它，会通过 PIT 通道 2 和端口 `61h` 播放一段短音阶，用于测试扬声器。
 

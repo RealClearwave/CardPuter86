@@ -63,6 +63,23 @@ void CalculaPulsosSonido(int frec)
  //unsigned char estadoOnda=0;
 }
 
+static unsigned int CurrentSpeakerFrequency()
+{
+ unsigned int divisor= (gb_frec_speaker_high<<8)|gb_frec_speaker_low;
+ return (divisor!=0)?(1193180/divisor):0;
+}
+
+static void UpdateSpeakerFromPIT()
+{
+ unsigned int frequency= CurrentSpeakerFrequency();
+ CalculaPulsosSonido(frequency);
+ if (speakerenabled)
+ {
+  gb_volumen01=128;
+  gb_frecuencia01= frequency;
+ }
+}
+
 void portout (uint16_t portnum, uint8_t value)
 {
  unsigned char auxIdport;        
@@ -85,15 +102,11 @@ void portout (uint16_t portnum, uint8_t value)
 				//if ( (value & 3) == 3) speakerenabled = 1;
 				//else speakerenabled = 0;
             speakerenabled= ( (value & 3) == 3)?1:0;
-            unsigned int aData= (gb_frec_speaker_high<<8)|gb_frec_speaker_low;
-            aData= (aData!=0)?(1193180/aData):0;            
             //aData = aData >>1;            
             //Serial.printf("speakerenabled %d Frec:0x%02X%02X %d Hz\n",speakerenabled,gb_frec_speaker_high,gb_frec_speaker_low,aData);
-            CalculaPulsosSonido(aData);
             if (speakerenabled)             
             {             
-             gb_volumen01=128;
-             gb_frecuencia01= aData;             
+             UpdateSpeakerFromPIT();
             }
             else
             {
@@ -312,9 +325,13 @@ void WriteTinyPortRAM(unsigned short int numPort, unsigned char aValue)
    else 
     gb_frec_speaker_high= aValue;
    gb_cont_frec_speaker++;
+   if ((gb_cont_frec_speaker & 1) == 0) UpdateSpeakerFromPIT();
    //Frecuencia speaker
    break;
-  case 0x043:  gb_portramTiny[10]=aValue; break;          
+  case 0x043:
+   gb_portramTiny[10]=aValue;
+   if ((aValue & 0xC0) == 0x80) gb_cont_frec_speaker=0;
+   break;
   case 0x060:  gb_portramTiny[fast_tiny_port_0x60]=aValue; break; //teclado
   case 0x061:  gb_portramTiny[fast_tiny_port_0x61]=aValue; break; //speaker
   case 0x063:  gb_portramTiny[13]=aValue; break;

@@ -39,7 +39,7 @@ La vista de texto predeterminada usa los [glifos Adafruit Classic 5x7](https://g
 
 ## Audio
 
-El PC Speaker se genera en una tarea FreeRTOS fijada al Core 0 y se envia a I2S DMA en bloques de 128 muestras. La imagen predeterminada `cardputer86.img` incluye `SNDTEST.COM`; ejecutelo desde DOS para reproducir una breve prueba por PIT/canal 2 y puerto `61h`.
+El PC Speaker se genera en una tarea FreeRTOS fijada al Core 0 y se envia a I2S DMA en bloques de 128 tramas estereo. La imagen predeterminada `cardputer86.img` incluye `SNDTEST.COM`; ejecutelo desde DOS para reproducir una breve prueba por PIT/canal 2 y puerto `61h`.
 
 ## Imagenes de disco
 

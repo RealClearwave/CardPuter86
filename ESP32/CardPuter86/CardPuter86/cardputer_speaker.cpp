@@ -10,14 +10,14 @@
 // ===============================================
 // I2S speaker driver for NS4168 amplifier
 // BCLK = G41, LRCLK = G43, DATA = G42
-// 16-bit mono, 16000 Hz sample rate
+// 16-bit stereo I2S frames, 16000 Hz sample rate
 // ===============================================
 
 #define I2S_PORT I2S_NUM_0
 #define AUDIO_TASK_CORE 0
 #define AUDIO_TASK_STACK 4096
 #define AUDIO_TASK_PRIORITY 3
-#define AUDIO_BUFFER_SAMPLES 128
+#define AUDIO_BUFFER_FRAMES 128
 
 static bool i2s_initialized = false;
 static TaskHandle_t audio_task_handle = nullptr;
@@ -39,12 +39,14 @@ static int16_t speaker_sample_from_phase(uint32_t *phase) {
 
 static void audio_task(void *parameter) {
     (void)parameter;
-    int16_t samples[AUDIO_BUFFER_SAMPLES];
+    int16_t samples[AUDIO_BUFFER_FRAMES * 2];
     uint32_t phase = 0;
 
     while (true) {
-        for (size_t i = 0; i < AUDIO_BUFFER_SAMPLES; i++) {
-            samples[i] = speaker_sample_from_phase(&phase);
+        for (size_t i = 0; i < AUDIO_BUFFER_FRAMES; i++) {
+            const int16_t sample = speaker_sample_from_phase(&phase);
+            samples[i * 2] = sample;
+            samples[i * 2 + 1] = sample;
         }
 
         size_t bytes_written = 0;
@@ -58,7 +60,7 @@ void cardputer_speaker_init(void) {
         .mode                 = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
         .sample_rate          = SAMPLE_RATE,
         .bits_per_sample      = I2S_BITS_PER_SAMPLE_16BIT,
-        .channel_format       = I2S_CHANNEL_FMT_ONLY_LEFT,
+        .channel_format       = I2S_CHANNEL_FMT_RIGHT_LEFT,
         .communication_format = I2S_COMM_FORMAT_STAND_I2S,
         .intr_alloc_flags     = ESP_INTR_FLAG_LEVEL1,
         .dma_buf_count        = 4,
@@ -116,15 +118,16 @@ void cardputer_speaker_write_sample(int16_t sample) {
     if (!i2s_initialized) return;
 
     size_t bytes_written = 0;
-    i2s_write(I2S_PORT, &sample, sizeof(sample), &bytes_written, 0);
+    int16_t frame[2] = { sample, sample };
+    i2s_write(I2S_PORT, frame, sizeof(frame), &bytes_written, 0);
 }
 
 void cardputer_speaker_mute(void) {
     // Write zeros to flush
     for (int i = 0; i < 10; i++) {
-        int16_t zero = 0;
+        int16_t zero[2] = { 0, 0 };
         size_t written;
-        i2s_write(I2S_PORT, &zero, sizeof(zero), &written, 0);
+        i2s_write(I2S_PORT, zero, sizeof(zero), &written, 0);
     }
 }
 
