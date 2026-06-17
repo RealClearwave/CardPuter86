@@ -31,6 +31,7 @@
 #include "cardputer_speaker.h"
 #include "cardputer_storage.h"
 #include "cardputer_cpu.h"
+#include "cardputer_settings.h"
 #include "guest_memory.h"
 
 // ===============================================
@@ -423,10 +424,13 @@ void handleinput() {
 // Main setup
 // ===============================================
 void setup() {
+    setCpuFrequencyMhz(240);
+
 #ifdef use_lib_log_serial
     Serial.begin(115200);
     delay(500);
     Serial.printf("\n=== CardPuter86 ===\n");
+    Serial.printf("ESP32-S3 CPU: %lu MHz\n", (unsigned long)getCpuFrequencyMhz());
     Serial.printf("Free heap: %lu\n", (unsigned long)ESP.getFreeHeap());
     Serial.printf("PSRAM: %lu\n", (unsigned long)ESP.getPsramSize());
 #endif
@@ -451,6 +455,7 @@ void setup() {
         : "128 KB guest RAM ready");
 
     cardputer_cpu_init();
+    cardputer_settings_init();
 
     // Probe storage, show Settings when Ctrl is pressed, then select the IMG.
     // Settings may change the effective guest RAM size for this boot.
@@ -470,7 +475,9 @@ void setup() {
 
     // Initialize I2S speaker
     cardputer_speaker_init();
-    cardputer_speaker_self_test();
+    if (cardputer_settings_post_sound_enabled()) {
+        cardputer_speaker_self_test();
+    }
 
     // BIOS data area: number of installed hard disks.
     if (gb_disk_image.mounted && gb_disk_image.drive == 0x80) {

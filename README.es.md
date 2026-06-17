@@ -49,7 +49,7 @@ Después de la comprobación opcional de SD, mantenga pulsado `Ctrl` para entrar
 
 Pulse `Ctrl` después de la comprobación SD para abrir Settings. El modo USB sólo se aplica al arranque actual. La opción de memoria de 512 KB se guarda en NVS y persiste tras apagar; desactivada o sin configurar, el PC emulado usa 128 KB por defecto. En modo 512 KB, las páginas activas usan una caché SRAM de 128 KB y las páginas frías una partición Flash con wear levelling.
 
-Settings también guarda un perfil aproximado de velocidad 8086: 4.77 MHz, 8 MHz, 10 MHz, 12 MHz o Unlimited. Los perfiles limitados suponen una media de cuatro ciclos por instrucción, por lo que la velocidad exacta depende del código ejecutado.
+Settings también guarda un perfil aproximado de velocidad 8086: 4.77 MHz, 8 MHz, 10 MHz, 12 MHz, 16 MHz, 24 MHz, 33 MHz o Unlimited. El sonido POST esta desactivado por defecto y se puede activar de forma persistente desde Settings. El firmware mantiene explicitamente la CPU ESP32-S3 host en su maximo estandar de 240 MHz. Los perfiles limitados suponen una media de cuatro ciclos por instrucción, por lo que la velocidad exacta depende del código ejecutado.
 
 ## Software integrado
 

@@ -14,6 +14,9 @@ static const CpuProfile CPU_PROFILES[] = {
     {"10 MHz", 10000000},
     {"12 MHz", 12000000},
     {"Unlimited", 0},
+    {"16 MHz", 16000000},
+    {"24 MHz", 24000000},
+    {"33 MHz", 33000000},
 };
 
 static const uint8_t DEFAULT_PROFILE = 4;

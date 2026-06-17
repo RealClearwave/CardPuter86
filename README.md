@@ -103,7 +103,7 @@ To import images from a computer, wait for the optional SD check and hold `Ctrl`
 
 Press `Ctrl` after the SD check to open POST Settings. USB disk mode applies only to the current boot. The 512 KB memory option is stored in NVS and remains selected after power-off; when disabled or unset, the emulated PC uses the default 128 KB. In 512 KB mode, a 128 KB SRAM page cache keeps active 4 KB pages in memory while cold dirty pages are written through ESP-IDF wear levelling to a dedicated Flash partition.
 
-Settings also provides persistent approximate 8086 CPU speed profiles: 4.77 MHz, 8 MHz, 10 MHz, 12 MHz, and Unlimited. The limiter models an average of four 8086 clock cycles per emulated instruction; actual software timing remains approximate because instruction costs vary.
+Settings also provides persistent approximate 8086 CPU speed profiles: 4.77 MHz, 8 MHz, 10 MHz, 12 MHz, 16 MHz, 24 MHz, 33 MHz, and Unlimited. POST sound is disabled by default and can be enabled persistently from Settings. The firmware explicitly keeps the ESP32-S3 host CPU at its standard 240 MHz maximum. The CPU limiter models an average of four 8086 clock cycles per emulated instruction; actual software timing remains approximate because instruction costs vary.
 
 `ESP32/CardPuter86/data/cardputer86.img` is used only by `--with-images`. This option resets the internal image partition, so routine firmware updates intentionally do not run `uploadfs`.
 

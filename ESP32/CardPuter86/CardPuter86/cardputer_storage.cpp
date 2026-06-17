@@ -2,6 +2,7 @@
 #include "hardware.h"
 #include "guest_memory.h"
 #include "cardputer_cpu.h"
+#include "cardputer_settings.h"
 #include <Arduino.h>
 #include <M5Cardputer.h>
 #include <SD.h>
@@ -786,15 +787,18 @@ bool cardputer_storage_enter_usb_mode_if_requested(void) {
     while (true) {
         char ram_item[32];
         char cpu_item[32];
+        char sound_item[32];
         snprintf(ram_item, sizeof(ram_item), "512 KB memory: %s",
                  guest_memory_512k_enabled() ? "Enabled" : "Disabled");
         snprintf(cpu_item, sizeof(cpu_item), "CPU speed: %s",
                  cardputer_cpu_profile_label(cardputer_cpu_profile()));
+        snprintf(sound_item, sizeof(sound_item), "POST sound: %s",
+                 cardputer_settings_post_sound_enabled() ? "Enabled" : "Disabled");
         const char *items[] = {
-            "USB disk mode", ram_item, cpu_item, "Continue boot"
+            "USB disk mode", ram_item, cpu_item, sound_item, "Continue boot"
         };
         const uint8_t choice = choose_menu(
-            "CardPuter86 Settings", items, 4, 0, false);
+            "CardPuter86 Settings", items, 5, 0, false);
         if (choice == 0) return start_selected_usb_mode();
         if (choice == 1) {
             const bool enable = !guest_memory_512k_enabled();
@@ -806,13 +810,22 @@ bool cardputer_storage_enter_usb_mode_if_requested(void) {
         }
         if (choice == 2) {
             const char *cpu_profiles[] = {
-                "4.77 MHz (IBM PC)", "8 MHz", "10 MHz", "12 MHz", "Unlimited"
+                "4.77 MHz (IBM PC)", "8 MHz", "10 MHz", "12 MHz",
+                "Unlimited (fastest)", "16 MHz", "24 MHz", "33 MHz"
             };
             const uint8_t profile = choose_menu(
                 "CPU speed", cpu_profiles, cardputer_cpu_profile_count(),
                 cardputer_cpu_profile(), false);
             if (!cardputer_cpu_set_profile(profile)) {
                 show_probe_status("CPU setting failed", "NVS write error");
+                delay(1500);
+            }
+            continue;
+        }
+        if (choice == 3) {
+            const bool enable = !cardputer_settings_post_sound_enabled();
+            if (!cardputer_settings_set_post_sound_enabled(enable)) {
+                show_probe_status("POST sound failed", "NVS write error");
                 delay(1500);
             }
             continue;

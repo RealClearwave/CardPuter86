@@ -49,7 +49,7 @@ After the optional SD check, hold `Ctrl` to enter USB storage mode. If SD was en
 
 Press `Ctrl` after the SD check to open POST Settings. USB disk mode applies only to the current boot. The 512 KB memory option is stored in NVS across power cycles; when disabled or unset, the emulated PC uses the default 128 KB. In 512 KB mode, active 4 KB pages use a 128 KB SRAM cache and cold dirty pages use a dedicated wear-levelled Flash partition.
 
-Settings also stores an approximate 8086 CPU speed profile: 4.77 MHz, 8 MHz, 10 MHz, 12 MHz, or Unlimited. Limited profiles use an average four-clock-per-instruction timing model, so exact speed varies with the instruction mix.
+Settings also stores an approximate 8086 CPU speed profile: 4.77 MHz, 8 MHz, 10 MHz, 12 MHz, 16 MHz, 24 MHz, 33 MHz, or Unlimited. POST sound is disabled by default and can be enabled persistently from Settings. The firmware explicitly keeps the ESP32-S3 host CPU at its standard 240 MHz maximum. Limited CPU profiles use an average four-clock-per-instruction timing model, so exact speed varies with the instruction mix.
 
 ## Embedded software
 
