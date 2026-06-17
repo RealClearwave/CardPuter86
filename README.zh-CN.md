@@ -59,7 +59,7 @@ pio run
 版本号默认读取根目录的 [`VERSION`](VERSION)，也可临时指定：
 
 ```sh
-./flash.sh --package --version 0.3.2
+./flash.sh --package --version 0.3.3
 ```
 
 产物位于 `release/M5Burner/`，包含：

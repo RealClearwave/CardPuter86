@@ -45,6 +45,16 @@ def emit_com() -> bytes:
         patches.append((len(code), target, "rel8"))
         b(0)
 
+    def jnz(target: str) -> None:
+        b(0x75)
+        patches.append((len(code), target, "rel8"))
+        b(0)
+
+    def loop(target: str) -> None:
+        b(0xE2)
+        patches.append((len(code), target, "rel8"))
+        b(0)
+
     # COM entry point.
     b(0xBA)
     patches.append((len(code), "msg", "off16"))
@@ -60,11 +70,11 @@ def emit_com() -> bytes:
     jz("done")
     call("speaker_on")
     b(0xB9)
-    w(4)                 # about 220 ms on the BIOS tick
+    w(12)
     call("delay_ticks")
     call("speaker_off")
     b(0xB9)
-    w(1)
+    w(2)
     call("delay_ticks")
     jmp("next_note")
 
@@ -104,20 +114,15 @@ def emit_com() -> bytes:
     b(0xC3)
 
     label("delay_ticks")
-    b(0x50, 0x53, 0x52, 0x1E)  # push ax,bx,dx,ds
-    b(0x89, 0xCB)              # mov bx,cx
-    b(0xB8)
-    w(0x0040)
-    b(0x8E, 0xD8)              # mov ds,ax
-    b(0x8B, 0x16)
-    w(0x006C)                  # mov dx,[006ch]
-    b(0x01, 0xD3)              # add bx,dx
-    label("delay_wait")
-    b(0x8B, 0x16)
-    w(0x006C)
-    b(0x39, 0xDA)              # cmp dx,bx
-    jb("delay_wait")
-    b(0x1F, 0x5A, 0x5B, 0x58, 0xC3)
+    b(0x50, 0x52)              # push ax,dx
+    label("delay_outer")
+    b(0xBA)
+    w(0xFFFF)                  # mov dx,ffffh
+    label("delay_inner")
+    b(0x4A)                    # dec dx
+    jnz("delay_inner")
+    loop("delay_outer")
+    b(0x5A, 0x58, 0xC3)        # pop dx,ax; ret
 
     label("msg")
     code.extend(

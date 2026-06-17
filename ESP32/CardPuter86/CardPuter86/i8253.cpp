@@ -63,6 +63,14 @@ void out8253 (uint16_t portnum, uint8_t value) {
 				
 				if (i8253.accessmode[portnum] == PIT_MODE_TOGGLE) i8253.bytetoggle[portnum] = (~i8253.bytetoggle[portnum]) & 1;
 				i8253.chanfreq[portnum] = (float) ( (uint32_t) ( ( (float) 1193182.0 / (float) i8253.effectivedata[portnum]) * (float) 1000.0) ) / (float) 1000.0;
+				if (portnum == 2) {
+					gb_frec_speaker_low = i8253.chandata[2] & 0xFF;
+					gb_frec_speaker_high = i8253.chandata[2] >> 8;
+					if (speakerenabled) {
+						gb_volumen01 = 128;
+						gb_frecuencia01 = (int)i8253.chanfreq[2];
+					}
+				}
 				//Serial.printf("[DEBUG] PIT channel %u counter changed to %u (%f Hz) Tickgap %u\n", portnum, i8253.chandata[portnum], i8253.chanfreq[portnum],tickgap);
 				//printf("[DEBUG] PIT channel %u counter changed to %u (%f Hz)\n", portnum, i8253.chandata[portnum], i8253.chanfreq[portnum]);
 				break;
