@@ -33,6 +33,7 @@ struct BootImageEntry {
 static SPIClass sd_spi;
 static bool sd_available = false;
 static bool flash_available = false;
+static bool flash_raw_fallback = false;
 static bool sd_detected = false;
 static bool flash_detected = false;
 static wl_handle_t flash_wl_handle = WL_INVALID_HANDLE;
@@ -221,6 +222,7 @@ static void unmount_sd(void) {
 }
 
 static bool mount_flash(void) {
+    flash_raw_fallback = false;
     esp_vfs_fat_mount_config_t config = {
         .format_if_mount_failed = false,
         .max_files = 4,
@@ -228,24 +230,45 @@ static bool mount_flash(void) {
     };
     esp_err_t result = esp_vfs_fat_spiflash_mount(
         FLASH_MOUNT_POINT, FLASH_PARTITION_LABEL, &config, &flash_wl_handle);
+    if (result == ESP_OK) {
+        flash_available = true;
+        return true;
+    }
+
+#ifdef use_lib_log_serial
+    Serial.printf("Internal IMG partition WL mount failed: %s\n",
+                  esp_err_to_name(result));
+#endif
+    flash_wl_handle = WL_INVALID_HANDLE;
+
+    result = esp_vfs_fat_rawflash_mount(
+        FLASH_MOUNT_POINT, FLASH_PARTITION_LABEL, &config);
     if (result != ESP_OK) {
 #ifdef use_lib_log_serial
-        Serial.printf("Internal IMG partition mount failed: %s\n",
+        Serial.printf("Internal IMG raw FAT fallback failed: %s\n",
                       esp_err_to_name(result));
 #endif
-        flash_wl_handle = WL_INVALID_HANDLE;
         return false;
     }
     flash_available = true;
+    flash_raw_fallback = true;
+#ifdef use_lib_log_serial
+    Serial.printf("Internal IMG mounted read-only via raw FAT fallback\n");
+#endif
     return true;
 }
 
 static void unmount_flash(void) {
-    if (flash_available && flash_wl_handle != WL_INVALID_HANDLE) {
-        esp_vfs_fat_spiflash_unmount(FLASH_MOUNT_POINT, flash_wl_handle);
+    if (flash_available) {
+        if (flash_raw_fallback) {
+            esp_vfs_fat_rawflash_unmount(FLASH_MOUNT_POINT, FLASH_PARTITION_LABEL);
+        } else if (flash_wl_handle != WL_INVALID_HANDLE) {
+            esp_vfs_fat_spiflash_unmount(FLASH_MOUNT_POINT, flash_wl_handle);
+        }
     }
     flash_wl_handle = WL_INVALID_HANDLE;
     flash_available = false;
+    flash_raw_fallback = false;
 }
 
 static void add_boot_image(CardputerStorageType storage, const char *path,
@@ -446,51 +469,72 @@ static bool text_input(const char *title, const char *hint, char *buffer,
     }
 }
 
-static void show_wifi_modem_menu(void) {
+static bool configure_wifi_from_scan(void) {
+    show_probe_status("Scanning Wi-Fi...", "Please wait");
+    CardputerWifiNetwork networks[CARDPUTER_MODEM_MAX_SCAN];
+    const int count = cardputer_modem_scan_networks(
+        networks, CARDPUTER_MODEM_MAX_SCAN);
+    if (count <= 0) {
+        show_probe_status("No Wi-Fi networks found",
+                          count < 0 ? "Scan failed" : "Try again");
+        delay(1500);
+        return false;
+    }
+
+    char labels[CARDPUTER_MODEM_MAX_SCAN][48];
+    const char *network_items[CARDPUTER_MODEM_MAX_SCAN];
+    for (int i = 0; i < count; i++) {
+        snprintf(labels[i], sizeof(labels[i]), "%c %3ld dBm %.30s",
+                 networks[i].encrypted ? '*' : ' ',
+                 (long)networks[i].rssi, networks[i].ssid);
+        network_items[i] = labels[i];
+    }
+    const uint8_t selected = choose_menu(
+        "Select Wi-Fi SSID", network_items, count, 0, false);
+
+    char pass[65] = {};
+    if (networks[selected].encrypted) {
+        char hint[64];
+        snprintf(hint, sizeof(hint), "Password for %.28s",
+                 networks[selected].ssid);
+        if (!text_input("Wi-Fi password", hint, pass, sizeof(pass), true)) {
+            return false;
+        }
+    } else {
+        show_probe_status("Open Wi-Fi selected", networks[selected].ssid);
+        delay(700);
+    }
+
+    if (!cardputer_modem_set_wifi(networks[selected].ssid, pass)) {
+        show_probe_status("Wi-Fi save failed", "NVS write error");
+        delay(1500);
+        return false;
+    }
+    return true;
+}
+
+static void show_wifi_settings_menu(void) {
     while (true) {
         char ssid_item[48];
-        char pass_item[32];
         char status_item[32];
         snprintf(ssid_item, sizeof(ssid_item), "SSID: %.34s",
                  cardputer_modem_ssid()[0] ? cardputer_modem_ssid() : "(not set)");
-        snprintf(pass_item, sizeof(pass_item), "Password: %s",
-                 cardputer_modem_has_password() ? "set" : "(empty)");
         snprintf(status_item, sizeof(status_item), "Wi-Fi: %s",
                  cardputer_modem_wifi_connected() ? "connected" : "disconnected");
         const char *items[] = {
-            ssid_item, pass_item, "Connect saved Wi-Fi", status_item,
+            "Configure Wi-Fi", ssid_item, status_item, "Connect saved Wi-Fi",
             "Clear Wi-Fi settings", "Back"
         };
-        const uint8_t choice = choose_menu("Wi-Fi Hayes modem", items, 6, 0, false);
+        const uint8_t choice = choose_menu("Wi-Fi settings", items, 6, 0, false);
         if (choice == 0) {
-            char ssid[33];
-            strncpy(ssid, cardputer_modem_ssid(), sizeof(ssid));
-            ssid[sizeof(ssid) - 1] = 0;
-            if (text_input("Wi-Fi SSID", "Printable ASCII, max 32 chars",
-                           ssid, sizeof(ssid), false)) {
-                if (!cardputer_modem_set_ssid(ssid)) {
-                    show_probe_status("Wi-Fi SSID failed", "NVS write error");
-                    delay(1500);
-                }
-            }
+            configure_wifi_from_scan();
             continue;
         }
-        if (choice == 1) {
-            char pass[65] = {};
-            if (text_input("Wi-Fi password", "Printable ASCII, max 64 chars",
-                           pass, sizeof(pass), true)) {
-                if (!cardputer_modem_set_password(pass)) {
-                    show_probe_status("Wi-Fi password failed", "NVS write error");
-                    delay(1500);
-                }
-            }
-            continue;
-        }
-        if (choice == 2) {
+        if (choice == 3) {
             show_probe_status("Connecting Wi-Fi...", cardputer_modem_ssid());
             const bool ok = cardputer_modem_connect_saved(15000);
             show_probe_status(ok ? "Wi-Fi connected" : "Wi-Fi connect failed",
-                              ok ? "COM1 modem ready" : "Check SSID/password");
+                              ok ? "Wi-Fi ready" : "Check SSID/password");
             delay(1500);
             continue;
         }
@@ -502,6 +546,22 @@ static void show_wifi_modem_menu(void) {
             continue;
         }
         if (choice == 5) return;
+    }
+}
+
+static void show_hayes_modem_menu(void) {
+    while (true) {
+        char status_item[40];
+        char wifi_item[48];
+        snprintf(status_item, sizeof(status_item), "COM1: 0x3F8 Hayes modem");
+        snprintf(wifi_item, sizeof(wifi_item), "Wi-Fi: %s",
+                 cardputer_modem_wifi_connected() ? "connected" : "disconnected");
+        const char *items[] = {
+            status_item, wifi_item, "DOS: MODEM.COM tests AT/OK",
+            "Dial: ATDT host:port", "Back"
+        };
+        const uint8_t choice = choose_menu("COM1 Hayes modem", items, 5, 4, false);
+        if (choice == 4) return;
     }
 }
 
@@ -570,7 +630,8 @@ static bool select_boot_image(void) {
             gb_disk_image = {};
             return false;
         }
-        flash_image_file = fopen(gb_disk_image.path, "r+b");
+        flash_image_file = fopen(gb_disk_image.path,
+                                 flash_raw_fallback ? "rb" : "r+b");
         gb_disk_image.mounted = flash_image_file != nullptr;
         if (!gb_disk_image.mounted) unmount_flash();
     } else {
@@ -709,6 +770,7 @@ bool cardputer_storage_read_sector(unsigned long lba, unsigned char *buffer) {
 bool cardputer_storage_write_sector(unsigned long lba, const unsigned char *buffer) {
     if (!gb_disk_image.mounted || (lba + 1) * 512UL > gb_disk_image.size) return false;
     if (gb_disk_image.storage == CARDPUTER_STORAGE_FLASH) {
+        if (flash_raw_fallback) return false;
         if (!flash_image_file) return false;
         bool ok = fseek(flash_image_file, lba * 512UL, SEEK_SET) == 0 &&
                   fwrite(buffer, 1, 512, flash_image_file) == 512;
@@ -912,21 +974,21 @@ bool cardputer_storage_enter_usb_mode_if_requested(void) {
         char ram_item[32];
         char cpu_item[32];
         char sound_item[32];
-        char modem_item[48];
+        char wifi_item[48];
         snprintf(ram_item, sizeof(ram_item), "512 KB memory: %s",
                  guest_memory_512k_enabled() ? "Enabled" : "Disabled");
         snprintf(cpu_item, sizeof(cpu_item), "CPU speed: %s",
                  cardputer_cpu_profile_label(cardputer_cpu_profile()));
         snprintf(sound_item, sizeof(sound_item), "POST sound: %s",
                  cardputer_settings_post_sound_enabled() ? "Enabled" : "Disabled");
-        snprintf(modem_item, sizeof(modem_item), "Wi-Fi modem: %.28s",
+        snprintf(wifi_item, sizeof(wifi_item), "Wi-Fi: %.34s",
                  cardputer_modem_ssid()[0] ? cardputer_modem_ssid() : "(not set)");
         const char *items[] = {
-            "USB disk mode", ram_item, cpu_item, sound_item, modem_item,
-            "Continue boot"
+            "USB disk mode", ram_item, cpu_item, sound_item, wifi_item,
+            "COM1 Hayes modem", "Continue boot"
         };
         const uint8_t choice = choose_menu(
-            "CardPuter86 Settings", items, 6, 0, false);
+            "CardPuter86 Settings", items, 7, 0, false);
         if (choice == 0) return start_selected_usb_mode();
         if (choice == 1) {
             const bool enable = !guest_memory_512k_enabled();
@@ -959,7 +1021,11 @@ bool cardputer_storage_enter_usb_mode_if_requested(void) {
             continue;
         }
         if (choice == 4) {
-            show_wifi_modem_menu();
+            show_wifi_settings_menu();
+            continue;
+        }
+        if (choice == 5) {
+            show_hayes_modem_menu();
             continue;
         }
         return false;

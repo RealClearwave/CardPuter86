@@ -45,7 +45,7 @@ El PC Speaker se genera en una tarea FreeRTOS fijada al Core 0 y se envia a I2S 
 
 CardPuter86 expone un modem virtual estilo Hayes en `COM1` (`0x3F8`). El software DOS ve un puerto serie parecido a 8250, mientras el ESP32-S3 gestiona Wi-Fi y TCP.
 
-Configure el SSID y la contrasena Wi-Fi desde POST Settings: despues de la comprobacion SD, mantenga `Ctrl` y abra `Wi-Fi modem`. Las credenciales se guardan en NVS. En DOS, ejecute `MODEM.COM` para probar COM1; envia `AT` y deberia mostrar el eco del comando y `OK`.
+Configure Wi-Fi desde POST Settings: despues de la comprobacion SD, mantenga `Ctrl`, abra `Wi-Fi settings`, escanee redes, elija un SSID e introduzca la contrasena. Las credenciales se guardan en NVS. La pagina separada `COM1 Hayes modem` solo muestra estado del modem e indicaciones de uso en DOS, separando la conectividad Wi-Fi de la emulacion serie para futuras funciones de importacion de archivos por Wi-Fi. En DOS, ejecute `MODEM.COM` para probar COM1; envia `AT` y deberia mostrar el eco del comando y `OK`.
 
 Desde un terminal DOS, use comandos como:
 
