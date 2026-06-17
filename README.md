@@ -105,7 +105,7 @@ Press `Fn+Space` while the emulator is running to pause and open Settings. The S
 
 Settings also provides persistent approximate 8086 CPU speed profiles: 4.77 MHz, 8 MHz, 10 MHz, 12 MHz, 16 MHz, 24 MHz, 33 MHz, and Unlimited. POST sound is disabled by default and can be enabled persistently from Settings. The firmware explicitly keeps the ESP32-S3 host CPU at its standard 240 MHz maximum. The CPU limiter models an average of four 8086 clock cycles per emulated instruction; actual software timing remains approximate because instruction costs vary.
 
-Power settings can set automatic sleep to 30 seconds, 2 minutes, 5 minutes, 10 minutes, or Never. The default is 2 minutes. Sleep uses ESP32-S3 light sleep with the LCD panel and backlight disabled; the firmware briefly wakes every 100 ms to scan the Cardputer keyboard matrix, and any key restores the display. G0 is not used for sleep or wake. Settings also includes a simulated RTC clock; DOS reads it through the standard CMOS RTC ports `70h/71h`.
+Power settings can set automatic sleep to 30 seconds, 2 minutes, 5 minutes, 10 minutes, or Never. The default is 2 minutes. Sleep uses ESP32-S3 light sleep with the LCD panel and backlight disabled; the firmware briefly wakes every 100 ms to scan the Cardputer keyboard matrix, and any key restores the display. G0 is not used for sleep or wake. Settings also includes a simulated RTC clock; DOS reads it through BIOS `INT 1Ah` and the standard CMOS RTC ports `70h/71h`.
 
 `ESP32/CardPuter86/data/cardputer86.img` is used only by `--with-images`. This option resets the internal image partition, so routine firmware updates intentionally do not run `uploadfs`.
 

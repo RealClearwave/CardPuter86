@@ -44,6 +44,7 @@
 #include <Arduino.h>
 #include "dataFlash/gbsnarare.h"
 #include "guest_memory.h"
+#include "cardputer_rtc.h"
 
 extern struct i8253_s i8253;
 
@@ -1888,6 +1889,114 @@ extern void nethandler();
 extern void diskhandler();
 extern void readdisk (uint8_t drivenum, uint16_t dstseg, uint16_t dstoff, uint16_t cyl, uint16_t sect, uint16_t head, uint16_t sectcount);
 
+static uint8_t rtc_to_bcd(uint8_t value)
+{
+	return ((value / 10) << 4) | (value % 10);
+}
+
+static int rtc_from_bcd(uint8_t value)
+{
+	const uint8_t high = value >> 4;
+	const uint8_t low = value & 0x0F;
+	if (high > 9 || low > 9) return -1;
+	return high * 10 + low;
+}
+
+static bool rtc_is_leap(uint16_t year)
+{
+	return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+}
+
+static uint8_t rtc_days_in_month(uint16_t year, uint8_t month)
+{
+	static const uint8_t days[] = {31,28,31,30,31,30,31,31,30,31,30,31};
+	if (month < 1 || month > 12) return 0;
+	if (month == 2 && rtc_is_leap(year)) return 29;
+	return days[month - 1];
+}
+
+static bool rtc_time_valid(const CardputerRtcTime &time)
+{
+	const uint8_t days = rtc_days_in_month(time.year, time.month);
+	return time.year >= 1980 && time.year <= 2099 &&
+	       days != 0 && time.day >= 1 && time.day <= days &&
+	       time.hour <= 23 && time.minute <= 59 && time.second <= 59;
+}
+
+static void rtc_interrupt_error(void)
+{
+	regs.byteregs[regah] = 0x80;
+	cf = 1;
+}
+
+static bool handle_rtc_interrupt(void)
+{
+	CardputerRtcTime now = cardputer_rtc_now();
+	switch (regs.byteregs[regah]) {
+		case 0x02: // Get RTC time.
+			regs.byteregs[regch] = rtc_to_bcd(now.hour);
+			regs.byteregs[regcl] = rtc_to_bcd(now.minute);
+			regs.byteregs[regdh] = rtc_to_bcd(now.second);
+			regs.byteregs[regdl] = 0x00; // daylight-saving flag not used
+			regs.byteregs[regah] = 0x00;
+			cf = 0;
+			return true;
+
+		case 0x03: { // Set RTC time.
+			const int hour = rtc_from_bcd(regs.byteregs[regch]);
+			const int minute = rtc_from_bcd(regs.byteregs[regcl]);
+			const int second = rtc_from_bcd(regs.byteregs[regdh]);
+			if (hour < 0 || minute < 0 || second < 0) {
+				rtc_interrupt_error();
+				return true;
+			}
+			now.hour = hour;
+			now.minute = minute;
+			now.second = second;
+			if (!rtc_time_valid(now) || !cardputer_rtc_set(now)) {
+				rtc_interrupt_error();
+				return true;
+			}
+			regs.byteregs[regah] = 0x00;
+			cf = 0;
+			return true;
+		}
+
+		case 0x04: // Get RTC date.
+			regs.byteregs[regch] = rtc_to_bcd(now.year / 100);
+			regs.byteregs[regcl] = rtc_to_bcd(now.year % 100);
+			regs.byteregs[regdh] = rtc_to_bcd(now.month);
+			regs.byteregs[regdl] = rtc_to_bcd(now.day);
+			regs.byteregs[regah] = 0x00;
+			cf = 0;
+			return true;
+
+		case 0x05: { // Set RTC date.
+			const int century = rtc_from_bcd(regs.byteregs[regch]);
+			const int year = rtc_from_bcd(regs.byteregs[regcl]);
+			const int month = rtc_from_bcd(regs.byteregs[regdh]);
+			const int day = rtc_from_bcd(regs.byteregs[regdl]);
+			if (century < 0 || year < 0 || month < 0 || day < 0) {
+				rtc_interrupt_error();
+				return true;
+			}
+			now.year = (uint16_t)(century * 100 + year);
+			now.month = month;
+			now.day = day;
+			if (!rtc_time_valid(now) || !cardputer_rtc_set(now)) {
+				rtc_interrupt_error();
+				return true;
+			}
+			regs.byteregs[regah] = 0x00;
+			cf = 0;
+			return true;
+		}
+
+		default:
+			return false;
+	}
+}
+
 void intcall86 (unsigned char intnum)
 {
 	static uint16_t lastint10ax;
@@ -1944,6 +2053,9 @@ void intcall86 (unsigned char intnum)
 				diskhandler();
 				return;
 #endif
+			case 0x1A:
+				if (handle_rtc_interrupt()) return;
+				break;
 #ifdef NETWORKING_OLDCARD
 			case 0xFC:
 #ifdef NETWORKING_ENABLED

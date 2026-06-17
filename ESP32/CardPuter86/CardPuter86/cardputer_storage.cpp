@@ -24,6 +24,7 @@ extern "C" {
 static const char *FLASH_MOUNT_POINT = "/flash";
 static const char *FLASH_PARTITION_LABEL = "disk";
 static const uint8_t MAX_BOOT_IMAGES = 20;
+static const uint8_t MENU_CANCEL = 0xFF;
 
 struct BootImageEntry {
     CardputerStorageType storage;
@@ -363,6 +364,10 @@ static uint8_t choose_menu(const char *title, const char *const *items,
         const bool down = cardputer_input_consume_char('s') ||
                           cardputer_input_consume_char('S') ||
                           cardputer_input_consume(CARDPUTER_VK_DOWN);
+        if (cardputer_input_consume(CARDPUTER_VK_ESC) ||
+            cardputer_input_consume_char('`')) {
+            return MENU_CANCEL;
+        }
         bool enter = cardputer_input_consume(CARDPUTER_VK_ENTER);
 
         if (up) {
@@ -387,8 +392,8 @@ static uint8_t choose_menu(const char *title, const char *const *items,
 
         if (redraw) {
             draw_menu(title, items, count, selected,
-                      timeout ? "W/S or arrows, Enter (auto 4s)" :
-                                "W/S or arrows, Enter");
+                      timeout ? "W/S/arrows Enter Esc (auto 4s)" :
+                                "W/S/arrows Enter Esc");
             redraw = false;
         }
         delay(15);
@@ -447,6 +452,7 @@ static bool select_boot_image(void) {
     if (boot_image_count > 1) {
         selected = choose_menu("Select boot image", items, boot_image_count,
                                selected, true);
+        if (selected == MENU_CANCEL) selected = 0;
     }
 
     const BootImageEntry &entry = boot_images[selected];
@@ -754,6 +760,10 @@ static bool start_selected_usb_mode(void) {
     if (sd_detected && mount_sd_timed()) {
         const char *items[] = {"Internal Flash", "SD Card"};
         uint8_t choice = choose_menu("USB storage source", items, 2, 0, false);
+        if (choice == MENU_CANCEL) {
+            unmount_sd();
+            return false;
+        }
         selected = choice == 0 ? CARDPUTER_STORAGE_FLASH : CARDPUTER_STORAGE_SD;
         if (selected == CARDPUTER_STORAGE_FLASH) unmount_sd();
     }
@@ -812,10 +822,11 @@ bool cardputer_storage_show_settings_menu(bool allow_usb_disk) {
         const char *items[] = {
             allow_usb_disk ? "USB disk mode" : "USB disk mode: Boot only",
             ram_item, cpu_item, sound_item,
-            sleep_item, rtc_item, "Continue boot"
+            sleep_item, rtc_item, "Continue"
         };
         const uint8_t choice = choose_menu(
             "CardPuter86 Settings", items, 7, 0, false);
+        if (choice == MENU_CANCEL) return false;
         if (choice == 0) {
             if (allow_usb_disk) return start_selected_usb_mode();
             show_probe_status("USB disk unavailable", "Use boot storage mode");
@@ -838,6 +849,7 @@ bool cardputer_storage_show_settings_menu(bool allow_usb_disk) {
             const uint8_t profile = choose_menu(
                 "CPU speed", cpu_profiles, cardputer_cpu_profile_count(),
                 cardputer_cpu_profile(), false);
+            if (profile == MENU_CANCEL) continue;
             if (!cardputer_cpu_set_profile(profile)) {
                 show_probe_status("CPU setting failed", "NVS write error");
                 delay(1500);
@@ -866,6 +878,7 @@ bool cardputer_storage_show_settings_menu(bool allow_usb_disk) {
             }
             const uint8_t profile = choose_menu(
                 "Sleep timeout", sleep_profiles, 5, selected, false);
+            if (profile == MENU_CANCEL) continue;
             if (!cardputer_settings_set_sleep_timeout_seconds(sleep_values[profile])) {
                 show_probe_status("Sleep setting failed", "NVS write error");
                 delay(1500);
@@ -902,7 +915,8 @@ bool cardputer_storage_show_settings_menu(bool allow_usb_disk) {
                 if (cardputer_input_consume(CARDPUTER_VK_BACKSPACE) && pos > 0) {
                     input[--pos] = '\0';
                 }
-                if (cardputer_input_consume(CARDPUTER_VK_ESC)) break;
+                if (cardputer_input_consume(CARDPUTER_VK_ESC) ||
+                    cardputer_input_consume_char('`')) break;
                 if (cardputer_input_consume(CARDPUTER_VK_ENTER)) {
                     CardputerRtcTime rtc_time;
                     if (cardputer_rtc_parse_yyyymmddhhmmss(input, &rtc_time) &&
