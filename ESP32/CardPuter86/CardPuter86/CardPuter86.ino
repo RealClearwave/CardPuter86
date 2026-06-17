@@ -539,6 +539,12 @@ void loop() {
         if (cardputer_input_any_pressed()) {
             cardputer_power_note_activity();
         }
+        if (cardputer_input_consume(CARDPUTER_VK_AUTO)) {
+            cardputer_storage_show_settings_menu(false);
+            gb_keyboard_time_before = millis();
+            gb_ini_vga = millis();
+            return;
+        }
         cardputer_display_update_mode_button();
         cardputer_kbd_fill_keymap();
         cardputer_power_poll();

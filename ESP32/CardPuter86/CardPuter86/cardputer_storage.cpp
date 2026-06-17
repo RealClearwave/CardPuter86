@@ -302,7 +302,24 @@ static void draw_menu(const char *title, const char *const *items, uint8_t count
     display.setTextColor(TFT_WHITE, TFT_BLUE);
     display.setTextSize(1);
     display.setCursor(4, 4);
-    display.print(title);
+    if (strcmp(title, "CardPuter86 Settings") == 0) {
+        display.print("Settings");
+        CardputerRtcTime now = cardputer_rtc_now();
+        char status_text[32];
+        const int32_t battery = M5Cardputer.Power.getBatteryLevel();
+        if (battery >= 0) {
+            snprintf(status_text, sizeof(status_text), "%02u:%02u:%02u  BAT %ld%%",
+                     now.hour, now.minute, now.second, (long)battery);
+        } else {
+            snprintf(status_text, sizeof(status_text), "%02u:%02u:%02u  BAT --%%",
+                     now.hour, now.minute, now.second);
+        }
+        const int status_x = display.width() - (int)strlen(status_text) * 6 - 4;
+        display.setCursor(status_x > 88 ? status_x : 88, 4);
+        display.print(status_text);
+    } else {
+        display.print(title);
+    }
 
     const uint8_t visible = 12;
     uint8_t first = selected >= visible ? selected - visible + 1 : 0;
@@ -335,39 +352,37 @@ static uint8_t choose_menu(const char *title, const char *const *items,
         delay(10);
     } while (true);
 
-    bool previous_up = false;
-    bool previous_down = false;
-    bool previous_enter = false;
     uint32_t deadline = millis() + 4000;
     bool redraw = true;
 
     while (true) {
         M5Cardputer.update();
-        auto state = M5Cardputer.Keyboard.keysState();
-        const bool up = M5Cardputer.Keyboard.isKeyPressed('w') ||
-                        cardputer_input_pressed(CARDPUTER_VK_UP);
-        const bool down = M5Cardputer.Keyboard.isKeyPressed('s') ||
-                          cardputer_input_pressed(CARDPUTER_VK_DOWN);
-        bool enter = state.enter;
+        const bool up = cardputer_input_consume_char('w') ||
+                        cardputer_input_consume_char('W') ||
+                        cardputer_input_consume(CARDPUTER_VK_UP);
+        const bool down = cardputer_input_consume_char('s') ||
+                          cardputer_input_consume_char('S') ||
+                          cardputer_input_consume(CARDPUTER_VK_DOWN);
+        bool enter = cardputer_input_consume(CARDPUTER_VK_ENTER);
 
-        if (up && !previous_up) {
+        if (up) {
             selected = selected == 0 ? count - 1 : selected - 1;
             timeout = false;
             redraw = true;
         }
-        if (down && !previous_down) {
+        if (down) {
             selected = (selected + 1) % count;
             timeout = false;
             redraw = true;
         }
         for (uint8_t i = 0; i < count && i < 9; i++) {
-            if (M5Cardputer.Keyboard.isKeyPressed('1' + i)) {
+            if (cardputer_input_consume_char('1' + i)) {
                 selected = i;
                 enter = true;
                 break;
             }
         }
-        if (enter && !previous_enter) return selected;
+        if (enter) return selected;
         if (timeout && (int32_t)(deadline - millis()) <= 0) return selected;
 
         if (redraw) {
@@ -376,9 +391,6 @@ static uint8_t choose_menu(const char *title, const char *const *items,
                                 "W/S or arrows, Enter");
             redraw = false;
         }
-        previous_up = up;
-        previous_down = down;
-        previous_enter = enter;
         delay(15);
     }
 }
@@ -499,9 +511,6 @@ bool cardputer_storage_init_and_select(void) {
         delay(250);
     }
 
-    // Settings is offered after storage probing and before a boot image
-    // filesystem is reopened. Raw MSC access must not overlap a mounted image.
-    cardputer_storage_enter_usb_mode_if_requested();
     show_probe_status("Selecting boot image...");
 
 #ifdef use_lib_log_serial
@@ -563,9 +572,9 @@ void cardputer_storage_show_boot_status(void) {
         display.print("No bootable IMG found");
         display.setTextColor(TFT_WHITE, TFT_BLACK);
         display.setCursor(6, 84);
-        display.print("Press Ctrl for Settings");
+        display.print("Use storage import workflow");
         display.setCursor(6, 97);
-        display.print("and choose USB disk mode");
+        display.print("then reboot with an IMG");
         delay(2500);
     }
 }
@@ -774,18 +783,7 @@ static bool start_selected_usb_mode(void) {
     while (true) delay(1000);
 }
 
-bool cardputer_storage_enter_usb_mode_if_requested(void) {
-    show_probe_status("Storage check complete", "Press Ctrl for Settings (1.5s)");
-    const uint32_t detection_deadline = millis() + 1500;
-    bool ctrl_pressed = false;
-    do {
-        M5Cardputer.update();
-        ctrl_pressed = M5Cardputer.Keyboard.keysState().ctrl;
-        if (ctrl_pressed) break;
-        delay(10);
-    } while ((int32_t)(detection_deadline - millis()) > 0);
-    if (!ctrl_pressed) return false;
-
+bool cardputer_storage_show_settings_menu(bool allow_usb_disk) {
     while (true) {
         char ram_item[32];
         char cpu_item[32];
@@ -812,12 +810,18 @@ bool cardputer_storage_enter_usb_mode_if_requested(void) {
         cardputer_rtc_format(cardputer_rtc_now(), rtc_text, sizeof(rtc_text));
         snprintf(rtc_item, sizeof(rtc_item), "RTC: %.20s", rtc_text);
         const char *items[] = {
-            "USB disk mode", ram_item, cpu_item, sound_item,
+            allow_usb_disk ? "USB disk mode" : "USB disk mode: Boot only",
+            ram_item, cpu_item, sound_item,
             sleep_item, rtc_item, "Continue boot"
         };
         const uint8_t choice = choose_menu(
             "CardPuter86 Settings", items, 7, 0, false);
-        if (choice == 0) return start_selected_usb_mode();
+        if (choice == 0) {
+            if (allow_usb_disk) return start_selected_usb_mode();
+            show_probe_status("USB disk unavailable", "Use boot storage mode");
+            delay(1500);
+            continue;
+        }
         if (choice == 1) {
             const bool enable = !guest_memory_512k_enabled();
             if (!guest_memory_set_512k_enabled(enable)) {
@@ -871,8 +875,6 @@ bool cardputer_storage_enter_usb_mode_if_requested(void) {
         if (choice == 5) {
             char input[15] = {};
             uint8_t pos = 0;
-            bool previous_enter = false;
-            bool previous_del = false;
             while (true) {
                 auto &display = M5Cardputer.Display;
                 display.fillScreen(TFT_BLACK);
@@ -892,18 +894,16 @@ bool cardputer_storage_enter_usb_mode_if_requested(void) {
                 display.print("Esc=cancel");
 
                 M5Cardputer.update();
-                const auto state = M5Cardputer.Keyboard.keysState();
-                for (char c : state.word) {
-                    if (c >= '0' && c <= '9' && pos < 14) {
-                        input[pos++] = c;
-                        input[pos] = '\0';
-                    }
+                const char digit = cardputer_input_consume_digit();
+                if (digit != 0 && pos < 14) {
+                    input[pos++] = digit;
+                    input[pos] = '\0';
                 }
-                if (state.del && !previous_del && pos > 0) {
+                if (cardputer_input_consume(CARDPUTER_VK_BACKSPACE) && pos > 0) {
                     input[--pos] = '\0';
                 }
-                if (cardputer_input_pressed(CARDPUTER_VK_ESC)) break;
-                if (state.enter && !previous_enter) {
+                if (cardputer_input_consume(CARDPUTER_VK_ESC)) break;
+                if (cardputer_input_consume(CARDPUTER_VK_ENTER)) {
                     CardputerRtcTime rtc_time;
                     if (cardputer_rtc_parse_yyyymmddhhmmss(input, &rtc_time) &&
                         cardputer_rtc_set(rtc_time)) {
@@ -914,9 +914,7 @@ bool cardputer_storage_enter_usb_mode_if_requested(void) {
                     delay(1500);
                     break;
                 }
-                previous_enter = state.enter;
-                previous_del = state.del;
-                delay(80);
+                delay(20);
             }
             continue;
         }

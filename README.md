@@ -77,13 +77,13 @@ The M5Burner submission cover is available as [SVG](preview/cardputer86-cover.sv
 - `Ctrl`, `Alt`: corresponding PC modifier keys
 - `Fn` + `;`, `,`, `.`, `/`: PC cursor Up, Left, Down, and Right. In text viewport navigation these also scroll the 40x16 view.
 - `Fn` + `'`: return a FIXED viewport to its top-left starting position
-- `Fn` + `Space`: return the text viewport to automatic follow mode
+- `Fn` + `Space`: pause the emulator and open Settings
 - `Opt`: switch between the default DSx86-style text mode and scaled mode. Text mode uses a readable 6x8 cell and supports viewport scrolling; scaled mode uses a 3x5 font for text screens and scales graphics screens to the full LCD.
 - `G0`: unused by the emulator power manager.
 
 The default text view uses the BSD-licensed [Adafruit Classic 5x7 glyphs](https://github.com/adafruit/Adafruit-GFX-Library/blob/master/glcdfont.c) in 6x8 cells. The scaled text view uses [Tom Thumb](https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5) by Robey Pointer, released under CC0.
 
-Text mode starts in AUTO mode and follows the last content line while keeping up to two detected bottom status rows pinned. Manual scrolling switches to FIXED mode; `Fn+Space` restores AUTO.
+Text mode starts in AUTO mode and follows the last content line while keeping up to two detected bottom status rows pinned. Manual scrolling switches to FIXED mode.
 
 Fn combinations replace their base keys, so `Fn+1` sends only F1 rather than both `1` and F1.
 
@@ -101,7 +101,7 @@ When more than one image is available, startup shows a boot menu. Use `W`/`S` (o
 
 To import images from a computer, wait for the optional SD check and hold `Ctrl` when it finishes. If SD was enabled with `Alt` and detected, select either `Internal Flash` or `SD Card`; otherwise the internal Flash is exported automatically as a USB drive. Copy `.img` files to its root, safely eject it, and reboot.
 
-Press `Ctrl` after the SD check to open POST Settings. USB disk mode applies only to the current boot. The 512 KB memory option is stored in NVS and remains selected after power-off; when disabled or unset, the emulated PC uses the default 128 KB. In 512 KB mode, a 128 KB SRAM page cache keeps active 4 KB pages in memory while cold dirty pages are written through ESP-IDF wear levelling to a dedicated Flash partition.
+Press `Fn+Space` while the emulator is running to pause and open Settings. The Settings title bar shows the current RTC time and battery level. Runtime Settings do not expose USB disk mode because the emulated disk is already mounted; use a storage import workflow for file import. The 512 KB memory option is stored in NVS and remains selected after power-off; when disabled or unset, the emulated PC uses the default 128 KB. In 512 KB mode, a 128 KB SRAM page cache keeps active 4 KB pages in memory while cold dirty pages are written through ESP-IDF wear levelling to a dedicated Flash partition.
 
 Settings also provides persistent approximate 8086 CPU speed profiles: 4.77 MHz, 8 MHz, 10 MHz, 12 MHz, 16 MHz, 24 MHz, 33 MHz, and Unlimited. POST sound is disabled by default and can be enabled persistently from Settings. The firmware explicitly keeps the ESP32-S3 host CPU at its standard 240 MHz maximum. The CPU limiter models an average of four 8086 clock cycles per emulated instruction; actual software timing remains approximate because instruction costs vary.
 

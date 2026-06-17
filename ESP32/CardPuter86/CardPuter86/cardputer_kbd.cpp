@@ -156,6 +156,7 @@ void cardputer_kbd_fill_keymap(void) {
             if (cardputer_input_pressed(CARDPUTER_VK_HOME)) keymap[PS2_KC_APOS] = 1;
             if (cardputer_input_pressed(CARDPUTER_VK_AUTO)) keymap[PS2_KC_SPACE] = 1;
         }
+        if (cardputer_input_pressed(CARDPUTER_VK_AUTO)) keymap[PS2_KC_SPACE] = 1;
     }
 
     if (shift_layer) {

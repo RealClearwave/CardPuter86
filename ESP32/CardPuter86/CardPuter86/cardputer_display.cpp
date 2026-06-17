@@ -411,8 +411,6 @@ void cardputer_display_update_mode_button(void) {
         cardputer_input_pressed(CARDPUTER_VK_LEFT);
     const bool right_pressed = navigation_active &&
         cardputer_input_pressed(CARDPUTER_VK_RIGHT);
-    const bool auto_pressed = navigation_active &&
-        cardputer_input_pressed(CARDPUTER_VK_AUTO);
     const bool home_pressed = navigation_active &&
         cardputer_input_pressed(CARDPUTER_VK_HOME);
 
@@ -428,7 +426,6 @@ void cardputer_display_update_mode_button(void) {
         ? body_source_rows - body_view_rows
         : 0;
 
-    if (auto_pressed && !nav_auto_was_pressed) text_auto_scroll = true;
     if (home_pressed && !nav_home_was_pressed && !text_auto_scroll) {
         text_view_col = 0;
         text_view_row = 0;
@@ -454,7 +451,7 @@ void cardputer_display_update_mode_button(void) {
     nav_down_was_pressed = down_pressed;
     nav_left_was_pressed = left_pressed;
     nav_right_was_pressed = right_pressed;
-    nav_auto_was_pressed = auto_pressed;
+    nav_auto_was_pressed = false;
     nav_home_was_pressed = home_pressed;
 }
 

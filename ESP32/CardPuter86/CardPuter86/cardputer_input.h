@@ -13,9 +13,14 @@ enum CardputerVirtualKey : uint8_t {
     CARDPUTER_VK_DEL,
     CARDPUTER_VK_HOME,
     CARDPUTER_VK_AUTO,
+    CARDPUTER_VK_ENTER,
+    CARDPUTER_VK_BACKSPACE,
 };
 
 bool cardputer_input_pressed(CardputerVirtualKey key);
+bool cardputer_input_consume(CardputerVirtualKey key);
+bool cardputer_input_consume_char(char key);
+char cardputer_input_consume_digit(void);
 bool cardputer_input_any_pressed(void);
 uint8_t cardputer_input_function_index(void);
 uint8_t cardputer_input_shift_symbol_index(void);
