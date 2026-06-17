@@ -41,6 +41,22 @@ La vista de texto predeterminada usa los [glifos Adafruit Classic 5x7](https://g
 
 El PC Speaker se genera en una tarea FreeRTOS fijada al Core 0 y se envia a I2S DMA en bloques de 128 tramas estereo. La imagen predeterminada `cardputer86.img` incluye `SNDTEST.COM`; ejecutelo desde DOS para reproducir una breve prueba por PIT/canal 2 y puerto `61h`.
 
+## Modem Wi-Fi
+
+CardPuter86 expone un modem virtual estilo Hayes en `COM1` (`0x3F8`). El software DOS ve un puerto serie parecido a 8250, mientras el ESP32-S3 gestiona Wi-Fi y TCP.
+
+Configure el SSID y la contrasena Wi-Fi desde POST Settings: despues de la comprobacion SD, mantenga `Ctrl` y abra `Wi-Fi modem`. Las credenciales se guardan en NVS. En DOS, ejecute `MODEM.COM` para probar COM1; envia `AT` y deberia mostrar el eco del comando y `OK`.
+
+Desde un terminal DOS, use comandos como:
+
+```text
+AT
+ATDT telehack.com:23
+ATH
+```
+
+Esta funcion esta pensada para Telnet, BBS, MUD y software serie simple. No es un packet driver ni una pila TCP/IP completa para DOS.
+
 ## Imagenes de disco
 
 Los archivos `.img` grabables se guardan en una particion FAT independiente de la Flash interna o en la raiz de la microSD. Si hay varias imagenes, un menu de inicio permite elegir cual arrancar. Tambien se aceptan archivos `.dsk` antiguos.

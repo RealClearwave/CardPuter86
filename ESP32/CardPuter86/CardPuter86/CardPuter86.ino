@@ -32,6 +32,7 @@
 #include "cardputer_storage.h"
 #include "cardputer_cpu.h"
 #include "cardputer_settings.h"
+#include "cardputer_modem.h"
 #include "guest_memory.h"
 
 // ===============================================
@@ -178,6 +179,7 @@ void inithardware() {
     initVideoPorts();
     inittiming();
     initscreen();
+    cardputer_modem_install_bda();
 }
 
 // ===============================================
@@ -193,6 +195,7 @@ void ProcesarAcciones() {
         running = 1;
         reset86();
         inithardware();
+        cardputer_modem_init();
         return;
     }
     if (gb_force_load_com == 1) {
@@ -456,6 +459,7 @@ void setup() {
 
     cardputer_cpu_init();
     cardputer_settings_init();
+    cardputer_modem_init();
 
     // Probe storage, show Settings when Ctrl is pressed, then select the IMG.
     // Settings may change the effective guest RAM size for this boot.
@@ -523,6 +527,7 @@ void loop() {
     if (gb_cur_cpu_ticks < gb_min_cpu_ticks)
         gb_min_cpu_ticks = gb_cur_cpu_ticks;
     cardputer_cpu_throttle(cpu_batch_instructions);
+    cardputer_modem_poll();
 
     // Scan keyboard on schedule
     gb_keyboard_time_cur = millis();

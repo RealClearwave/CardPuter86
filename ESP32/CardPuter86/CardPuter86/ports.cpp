@@ -25,6 +25,7 @@
 #include "gbGlobals.h"
 #include "cpu.h"
 #include "ports.h"
+#include "cardputer_modem.h"
 
 //Lista puertos
 //0x60 teclado
@@ -83,6 +84,11 @@ static void UpdateSpeakerFromPIT()
 void portout (uint16_t portnum, uint8_t value)
 {
  unsigned char auxIdport;        
+ if (cardputer_modem_handles_port(portnum))
+ {
+  cardputer_modem_port_out(portnum, value);
+  return;
+ }
  if (portnum >= (gb_max_portram-1))
   return;     
     #ifdef use_lib_limit_portram 
@@ -142,6 +148,8 @@ void portout (uint16_t portnum, uint8_t value)
 uint8_t portin (uint16_t portnum)
 {
  unsigned char auxIdport;           
+ if (cardputer_modem_handles_port(portnum))
+  return cardputer_modem_port_in(portnum);
  if (portnum >= (gb_max_portram-1))
   return 0;
 	//printf("portin(0x%X);\n", portnum);
