@@ -28,6 +28,7 @@
 //JJ #include "mutex.h"
 #include "gbGlobals.h"
 #include "ports.h"
+#include "cardputer_speaker.h"
 #include <string.h>
 #include <Arduino.h>
 
@@ -66,7 +67,12 @@ void out8253 (uint16_t portnum, uint8_t value) {
 				if (portnum == 2) {
 					gb_frec_speaker_low = i8253.chandata[2] & 0xFF;
 					gb_frec_speaker_high = i8253.chandata[2] >> 8;
-					if (speakerenabled) {
+					const uint8_t port61 = ReadTinyPortRAM(0x61);
+					cardputer_speaker_set_pc_speaker(
+						port61 & 0x01,
+						(port61 >> 1) & 0x01,
+						i8253.effectivedata[2]);
+					if ((port61 & 0x03) == 0x03) {
 						gb_volumen01 = 128;
 						gb_frecuencia01 = (int)i8253.chanfreq[2];
 					}
@@ -75,8 +81,13 @@ void out8253 (uint16_t portnum, uint8_t value) {
 				//printf("[DEBUG] PIT channel %u counter changed to %u (%f Hz)\n", portnum, i8253.chandata[portnum], i8253.chanfreq[portnum]);
 				break;
 			case 3: //mode/command
-				i8253.accessmode[value>>6] = (value >> 4) & 3;
-				if (i8253.accessmode[value>>6] == PIT_MODE_TOGGLE) i8253.bytetoggle[value>>6] = 0;
+				if ((value >> 6) < 3) {
+					const uint8_t channel = value >> 6;
+					i8253.accessmode[channel] = (value >> 4) & 3;
+					i8253.mode[channel] = (value >> 1) & 7;
+					if (i8253.mode[channel] >= 6) i8253.mode[channel] -= 4;
+					if (i8253.accessmode[channel] == PIT_MODE_TOGGLE) i8253.bytetoggle[channel] = 0;
+				}
 				break;
 		}
 }

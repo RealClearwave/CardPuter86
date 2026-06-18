@@ -18,24 +18,39 @@
 #define AUDIO_TASK_STACK 4096
 #define AUDIO_TASK_PRIORITY 3
 #define AUDIO_BUFFER_FRAMES 128
+#define PIT_BASE_HZ 1193182U
+#define PC_SPEAKER_PIT_AMPLITUDE 10000
+#define PC_SPEAKER_DIRECT_AMPLITUDE 3500
 
 static bool i2s_initialized = false;
 static TaskHandle_t audio_task_handle = nullptr;
 static volatile bool direct_output_active = false;
+static volatile uint8_t pc_speaker_gate = 0;
+static volatile uint8_t pc_speaker_data = 0;
+static volatile uint32_t pc_speaker_divisor = 0;
 
 static int16_t speaker_sample_from_phase(uint32_t *phase) {
-    const int volume = gb_silence ? 0 : gb_volumen01;
-    const int frequency = gb_frecuencia01;
-    if (volume <= 0 || frequency <= 0) {
+    if (gb_silence || !pc_speaker_data) {
         *phase = 0;
         return 0;
     }
 
-    const uint32_t step =
-        (uint32_t)(((uint64_t)frequency << 32) / SAMPLE_RATE);
+    const uint32_t divisor = pc_speaker_divisor;
+    if (!pc_speaker_gate || divisor == 0) {
+        return pc_speaker_data ? PC_SPEAKER_DIRECT_AMPLITUDE
+                               : -PC_SPEAKER_DIRECT_AMPLITUDE;
+    }
+
+    const uint32_t frequency = PIT_BASE_HZ / divisor;
+    if (frequency == 0) {
+        *phase = 0;
+        return 0;
+    }
+
+    const uint32_t step = (uint32_t)(((uint64_t)frequency << 32) / SAMPLE_RATE);
     *phase += step;
-    const int amplitude = volume * 256;
-    return (*phase & 0x80000000UL) ? amplitude : -amplitude;
+    return (*phase & 0x80000000UL) ? PC_SPEAKER_PIT_AMPLITUDE
+                                   : -PC_SPEAKER_PIT_AMPLITUDE;
 }
 
 static void audio_task(void *parameter) {
@@ -180,4 +195,25 @@ void cardputer_speaker_self_test(void) {
 
 bool cardputer_speaker_task_running(void) {
     return audio_task_handle != nullptr;
+}
+
+void cardputer_speaker_set_pc_speaker(uint8_t gate, uint8_t data,
+                                      uint32_t divisor) {
+    pc_speaker_gate = gate ? 1 : 0;
+    pc_speaker_data = data ? 1 : 0;
+    pc_speaker_divisor = divisor;
+
+    if (!data || (gate && divisor == 0)) {
+        gb_volumen01 = 0;
+        gb_frecuencia01 = 0;
+        return;
+    }
+
+    if (gate) {
+        gb_volumen01 = 128;
+        gb_frecuencia01 = PIT_BASE_HZ / divisor;
+    } else {
+        gb_volumen01 = 0;
+        gb_frecuencia01 = 0;
+    }
 }

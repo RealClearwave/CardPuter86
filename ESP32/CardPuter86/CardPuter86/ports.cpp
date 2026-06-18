@@ -26,6 +26,8 @@
 #include "cpu.h"
 #include "ports.h"
 #include "cardputer_rtc.h"
+#include "cardputer_speaker.h"
+#include "i8253.h"
 
 //Lista puertos
 //0x60 teclado
@@ -54,6 +56,26 @@
 //JJ void * (port_write_callback16[gb_max_portram]);
 //JJ void * (port_read_callback16[gb_max_portram]); 
 
+#define PC_PIT_BASE_HZ 1193182U
+
+extern struct i8253_s i8253;
+
+static uint8_t pc_speaker_port61 = 0;
+static uint8_t pc_speaker_refresh_flip = 0;
+
+static uint32_t CurrentSpeakerDivisor()
+{
+ uint32_t divisor = i8253.effectivedata[2];
+ if (divisor == 0) divisor = (gb_frec_speaker_high << 8) | gb_frec_speaker_low;
+ if (divisor == 0) divisor = 65536;
+ return divisor;
+}
+
+static unsigned int CurrentSpeakerFrequency()
+{
+ uint32_t divisor = CurrentSpeakerDivisor();
+ return (divisor != 0) ? (PC_PIT_BASE_HZ / divisor) : 0;
+}
 
 void CalculaPulsosSonido(int frec)
 { 
@@ -64,21 +86,50 @@ void CalculaPulsosSonido(int frec)
  //unsigned char estadoOnda=0;
 }
 
-static unsigned int CurrentSpeakerFrequency()
+static void ApplyPCSpeakerState()
 {
- unsigned int divisor= (gb_frec_speaker_high<<8)|gb_frec_speaker_low;
- return (divisor!=0)?(1193180/divisor):0;
+ const uint8_t gate = pc_speaker_port61 & 0x01;
+ const uint8_t data = (pc_speaker_port61 >> 1) & 0x01;
+ const uint32_t divisor = CurrentSpeakerDivisor();
+ speakerenabled = data ? 1 : 0;
+ cardputer_speaker_set_pc_speaker(gate, data, divisor);
 }
 
 static void UpdateSpeakerFromPIT()
 {
  unsigned int frequency= CurrentSpeakerFrequency();
  CalculaPulsosSonido(frequency);
- if (speakerenabled)
+ if (speakerenabled && (pc_speaker_port61 & 0x01))
  {
   gb_volumen01=128;
   gb_frecuencia01= frequency;
  }
+ ApplyPCSpeakerState();
+}
+
+static uint8_t CurrentPIT2Output()
+{
+ const uint32_t divisor = CurrentSpeakerDivisor();
+ if ((pc_speaker_port61 & 0x01) == 0 || divisor == 0) return 0;
+
+ const uint32_t phase = (uint32_t)(((uint64_t)(micros() % 1000000UL) *
+                                    PC_PIT_BASE_HZ) % divisor);
+ return phase < (divisor / 2) ? 1 : 0;
+}
+
+static void WritePCSpeakerPort(uint8_t value)
+{
+ pc_speaker_port61 = value & 0x03;
+ gb_portramTiny[fast_tiny_port_0x61] = pc_speaker_port61;
+ ApplyPCSpeakerState();
+}
+
+static uint8_t ReadPCSpeakerPort()
+{
+ pc_speaker_refresh_flip ^= 0x10;
+ uint8_t value = pc_speaker_port61 | pc_speaker_refresh_flip;
+ if (CurrentPIT2Output()) value |= 0x20;
+ return value;
 }
 
 void portout (uint16_t portnum, uint8_t value)
@@ -103,27 +154,6 @@ void portout (uint16_t portnum, uint8_t value)
                 cardputer_rtc_select_register(value);
                 return;
 			case 0x61:
-				//if ( (value & 3) == 3) speakerenabled = 1;
-				//else speakerenabled = 0;
-            speakerenabled= ( (value & 3) == 3)?1:0;
-            //aData = aData >>1;            
-            //Serial.printf("speakerenabled %d Frec:0x%02X%02X %d Hz\n",speakerenabled,gb_frec_speaker_high,gb_frec_speaker_low,aData);
-            if (speakerenabled)             
-            {             
-             UpdateSpeakerFromPIT();
-            }
-            else
-            {
-             gb_volumen01=0;
-             gb_frecuencia01= 0;
-             //if (speaker_pin_estado != LOW)
-             //{
-             // //digitalWrite(25, LOW);             
-             // REG_WRITE(GPIO_OUT_W1TC_REG , BIT25); //LOW clear
-             // speaker_pin_estado=0;
-             //}
-             //gb_pulsos_onda=0;
-            }            
 				return;
 		}
 
@@ -339,7 +369,7 @@ void WriteTinyPortRAM(unsigned short int numPort, unsigned char aValue)
    if ((aValue & 0xC0) == 0x80) gb_cont_frec_speaker=0;
    break;
   case 0x060:  gb_portramTiny[fast_tiny_port_0x60]=aValue; break; //teclado
-  case 0x061:  gb_portramTiny[fast_tiny_port_0x61]=aValue; break; //speaker
+  case 0x061:  WritePCSpeakerPort(aValue); break; //speaker
   case 0x063:  gb_portramTiny[13]=aValue; break;
   case 0x064:  gb_portramTiny[fast_tiny_port_0x64]=aValue; break; //teclado
   case 0x081:  gb_portramTiny[15]=aValue; break;
@@ -404,7 +434,7 @@ unsigned char ReadTinyPortRAM(unsigned short int numPort)
   case 0x042: aReturn= gb_portramTiny[9]; break;
   case 0x043: aReturn= gb_portramTiny[10]; break;          
   case 0x060: aReturn= gb_portramTiny[fast_tiny_port_0x60]; break; //teclado
-  case 0x061: aReturn= gb_portramTiny[fast_tiny_port_0x61]; break; //speaker
+  case 0x061: aReturn= ReadPCSpeakerPort(); break; //speaker
   case 0x063: aReturn= gb_portramTiny[13]; break;
   case 0x064: aReturn= gb_portramTiny[fast_tiny_port_0x64]; break; //teclado
   case 0x081: aReturn= gb_portramTiny[15]; break;
