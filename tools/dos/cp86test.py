@@ -46,7 +46,15 @@ def emit_com() -> bytes:
         b(0xBA); patches.append((len(code), name, "off16")); w(0)
         b(0xB4, 0x09, 0xCD, 0x21)
 
+    def ask_test(prompt: str, skip: str) -> None:
+        print_msg(prompt)
+        call("ask_run")
+        b(0x84, 0xC0)  # test al,al
+        jz(skip)
+
     print_msg("title")
+
+    ask_test("rtc_prompt", "skip_rtc")
     print_msg("rtc_label")
     b(0xB4, 0x2A, 0xCD, 0x21)  # DOS get date
     b(0x89, 0xC8); call("print_word_dec")  # CX year
@@ -62,26 +70,34 @@ def emit_com() -> bytes:
     b(0xB0, ord(':')); call("putch")
     b(0x88, 0xF0); call("print_byte_2d")   # DH second
     print_msg("crlf")
+    label("skip_rtc")
 
+    ask_test("bios_prompt", "skip_bios")
     print_msg("bios_label")
     b(0xB4, 0x00, 0xCD, 0x1A)  # BIOS get ticks
     print_msg("ticks_msg")
     b(0x89, 0xC8); call("print_hex16")
     b(0x89, 0xD0); call("print_hex16")
     print_msg("crlf")
+    label("skip_bios")
 
+    ask_test("disk_prompt", "skip_disk")
     print_msg("disk_label")
     b(0xB2, 0x00); call("probe_drive")
     b(0xB2, 0x01); call("probe_drive")
     b(0xB2, 0x80); call("probe_drive")
     b(0xB2, 0x81); call("probe_drive")
+    label("skip_disk")
 
+    ask_test("kbd_prompt", "skip_kbd")
     print_msg("kbd_label")
     b(0xB4, 0x08, 0xCD, 0x21)  # getchar no echo
     print_msg("key_msg")
     call("print_hex8")
     print_msg("crlf")
+    label("skip_kbd")
 
+    ask_test("sound_prompt", "skip_sound")
     print_msg("sound_label")
     b(0xBE); patches.append((len(code), "notes", "off16")); w(0)
     label("next_note")
@@ -93,11 +109,23 @@ def emit_com() -> bytes:
     jmp("next_note")
     label("done_sound")
     call("speaker_off")
+    label("skip_sound")
 
+    ask_test("modem_prompt", "skip_modem")
     print_msg("modem_label")
     call("modem_test")
+    label("skip_modem")
 
+    ask_test("network_prompt", "skip_network")
+    print_msg("network_label")
+    b(0xBE); patches.append((len(code), "wifi_status_cmd", "off16")); w(0)
+    call("modem_send_string")
+    call("modem_print_response")
+    label("skip_network")
+
+    ask_test("usb_prompt", "skip_usb")
     print_msg("usb_label")
+    label("skip_usb")
     print_msg("done_msg")
     b(0xB8); w(0x4C00); b(0xCD, 0x21)
 
@@ -118,6 +146,17 @@ def emit_com() -> bytes:
 
     label("putch")
     b(0x52, 0x88, 0xC2, 0xB4, 0x02, 0xCD, 0x21, 0x5A, 0xC3)
+
+    label("ask_run")
+    print_msg("run_prompt")
+    b(0xB4, 0x08, 0xCD, 0x21)  # getchar no echo
+    b(0x3C, ord('n')); jz("ask_skip")
+    b(0x3C, ord('N')); jz("ask_skip")
+    print_msg("crlf")
+    b(0xB0, 0x01, 0xC3)        # mov al,1; ret
+    label("ask_skip")
+    print_msg("skipped_msg")
+    b(0x30, 0xC0, 0xC3)        # xor al,al; ret
 
     label("print_nibble")
     b(0x24, 0x0F, 0x04, 0x30, 0x3C, 0x3A)
@@ -188,6 +227,30 @@ def emit_com() -> bytes:
     print_msg("present_msg")
     b(0xC3)
 
+    label("modem_send_string")
+    b(0xAC)                    # lodsb
+    b(0x08, 0xC0)              # or al,al
+    jz("modem_send_string_done")
+    call("modem_send")
+    jmp("modem_send_string")
+    label("modem_send_string_done")
+    b(0xC3)
+
+    label("modem_print_response")
+    b(0xB9); w(0xFFFF)
+    label("modem_response_wait")
+    b(0xBA); w(0x03FD)
+    b(0xEC, 0xA8, 0x01)       # in al,dx; test al,1
+    jz("modem_response_next")
+    b(0xBA); w(0x03F8)
+    b(0xEC)
+    call("putch")
+    b(0xB9); w(0x4000)        # extend timeout after activity
+    label("modem_response_next")
+    loop("modem_response_wait")
+    print_msg("crlf")
+    b(0xC3)
+
     label("modem_send")
     b(0x50)                   # push ax
     b(0xB9); w(0xFFFF)
@@ -213,12 +276,22 @@ def emit_com() -> bytes:
 
     label("title")
     code.extend(b"\r\nCardPuter86 all-in-one test\r\n$" )
+    label("run_prompt")
+    code.extend(b"Run? [Y/n] $")
+    label("skipped_msg")
+    code.extend(b"\r\nskipped\r\n$")
+    label("rtc_prompt")
+    code.extend(b"\r\nRTC/DOS time test\r\n$")
     label("rtc_label")
     code.extend(b"RTC/DOS time: $")
+    label("bios_prompt")
+    code.extend(b"\r\nBIOS clock test\r\n$")
     label("bios_label")
     code.extend(b"BIOS clock: $")
     label("ticks_msg")
     code.extend(b"ticks=0x$")
+    label("disk_prompt")
+    code.extend(b"\r\nDisk INT13 probe test\r\n$")
     label("disk_label")
     code.extend(b"Disk INT13 probes:\r\n$")
     label("drive_prefix")
@@ -229,14 +302,26 @@ def emit_com() -> bytes:
     code.extend(b"present\r\n$")
     label("missing_msg")
     code.extend(b"missing\r\n$")
+    label("kbd_prompt")
+    code.extend(b"\r\nKeyboard input test\r\n$")
     label("kbd_label")
     code.extend(b"Keyboard test: press one key...$")
     label("key_msg")
     code.extend(b"\r\nASCII/scan low byte: 0x$")
+    label("sound_prompt")
+    code.extend(b"\r\nPC speaker test\r\n$")
     label("sound_label")
     code.extend(b"Speaker test: playing tones...\r\n$")
+    label("modem_prompt")
+    code.extend(b"\r\nCOM1 Hayes modem AT test\r\n$")
     label("modem_label")
     code.extend(b"Hayes modem COM1 AT probe: $")
+    label("network_prompt")
+    code.extend(b"\r\nNetwork status test\r\n$")
+    label("network_label")
+    code.extend(b"Hayes modem AT+WIFI? response:\r\n$")
+    label("usb_prompt")
+    code.extend(b"\r\nUSB mode note\r\n$")
     label("usb_label")
     code.extend(b"USB modes are selected from Settings.\r\n$")
     label("done_msg")
@@ -246,6 +331,8 @@ def emit_com() -> bytes:
     label("notes")
     for freq in (262, 330, 392, 523, 392, 330, 262, 0):
         w(freq)
+    label("wifi_status_cmd")
+    code.extend(b"AT+WIFI?\r\0")
 
     for offset, target, kind in patches:
         target_offset = labels[target]
