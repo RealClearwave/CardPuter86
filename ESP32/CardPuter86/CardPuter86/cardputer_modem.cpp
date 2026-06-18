@@ -49,6 +49,10 @@ static bool rx_full(void) {
     return (uint8_t)(rx_head + 1) == rx_tail;
 }
 
+static void rx_clear(void) {
+    rx_head = rx_tail = 0;
+}
+
 static void rx_push(uint8_t value) {
     if (rx_full()) return;
     rx_buf[rx_head++] = value;
@@ -121,6 +125,10 @@ static void hangup(void) {
 }
 
 static void parse_wifi_command(const char *args) {
+    if (!cardputer_settings_com1_enabled()) {
+        result("NETWORK DISABLED");
+        return;
+    }
     if (args[0] == '?') {
         if (WiFi.status() == WL_CONNECTED) {
             result("WIFI CONNECTED");
@@ -138,6 +146,10 @@ static void parse_wifi_command(const char *args) {
 }
 
 static void dial_tcp(const char *target) {
+    if (!cardputer_settings_com1_enabled()) {
+        result("NO CARRIER");
+        return;
+    }
     if (WiFi.status() != WL_CONNECTED) {
         if (!wifi_started) start_wifi();
         result("NO CARRIER");
@@ -276,7 +288,7 @@ void cardputer_modem_init(void) {
     cmd_len = 0;
     echo_on = true;
     command_mode = true;
-    rx_head = rx_tail = 0;
+    rx_clear();
     load_wifi_settings();
     if (wifi_ssid[0] != '\0') start_wifi();
 }
@@ -326,8 +338,7 @@ void cardputer_modem_resume_wifi(void) {
 }
 
 bool cardputer_modem_port(uint16_t port) {
-    return cardputer_settings_com1_enabled() &&
-        port >= COM1_BASE && port <= COM1_BASE + 7;
+    return port >= COM1_BASE && port <= COM1_BASE + 7;
 }
 
 void cardputer_modem_write(uint16_t port, uint8_t value) {
@@ -345,6 +356,9 @@ void cardputer_modem_write(uint16_t port, uint8_t value) {
             break;
         case 1:
             ier = value;
+            break;
+        case 2:
+            if (value & 0x02) rx_clear();
             break;
         case 3:
             lcr = value;

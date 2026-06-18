@@ -222,8 +222,9 @@ def emit_com() -> bytes:
     b(0xBA); w(0x03FC)        # DTR + RTS + OUT2
     b(0xB0, 0x0B)
     b(0xEE)
-    b(0xBA); w(0x03FA)        # read IIR once to settle clones
-    b(0xEC)
+    b(0xBA); w(0x03FA)        # FCR: enable FIFO, clear RX/TX on 16550 clones
+    b(0xB0, 0x07)
+    b(0xEE)
     b(0xC3)
 
     label("modem_test")
