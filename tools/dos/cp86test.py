@@ -113,11 +113,13 @@ def emit_com() -> bytes:
 
     ask_test("modem_prompt", "skip_modem")
     print_msg("modem_label")
+    call("modem_init_com1")
     call("modem_test")
     label("skip_modem")
 
     ask_test("network_prompt", "skip_network")
     print_msg("network_label")
+    call("modem_init_com1")
     b(0xBE); patches.append((len(code), "wifi_status_cmd", "off16")); w(0)
     call("modem_send_string")
     call("modem_print_response")
@@ -200,6 +202,29 @@ def emit_com() -> bytes:
 
     label("speaker_off")
     b(0xE4, 0x61, 0x24, 0xFC, 0xE6, 0x61, 0xC3)
+
+    label("modem_init_com1")
+    b(0xBA); w(0x03FB)        # LCR
+    b(0xB0, 0x80)             # DLAB on
+    b(0xEE)
+    b(0xBA); w(0x03F8)        # divisor low: 115200 / 9600 = 12
+    b(0xB0, 0x0C)
+    b(0xEE)
+    b(0xBA); w(0x03F9)        # divisor high
+    b(0x30, 0xC0)
+    b(0xEE)
+    b(0xBA); w(0x03FB)        # 8 data bits, no parity, 1 stop, DLAB off
+    b(0xB0, 0x03)
+    b(0xEE)
+    b(0xBA); w(0x03F9)        # IER off
+    b(0x30, 0xC0)
+    b(0xEE)
+    b(0xBA); w(0x03FC)        # DTR + RTS + OUT2
+    b(0xB0, 0x0B)
+    b(0xEE)
+    b(0xBA); w(0x03FA)        # read IIR once to settle clones
+    b(0xEC)
+    b(0xC3)
 
     label("modem_test")
     b(0xB0, ord('A')); call("modem_send")
