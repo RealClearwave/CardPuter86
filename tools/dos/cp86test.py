@@ -36,6 +36,9 @@ def emit_com() -> bytes:
     def jnz(target: str) -> None:
         b(0x75); patches.append((len(code), target, "rel8")); b(0)
 
+    def jnc(target: str) -> None:
+        b(0x73); patches.append((len(code), target, "rel8")); b(0)
+
     def loop(target: str) -> None:
         b(0xE2); patches.append((len(code), target, "rel8")); b(0)
 
@@ -103,7 +106,7 @@ def emit_com() -> bytes:
     print_msg("colon_space")
     b(0x5A, 0x52)              # pop dx; push dx
     b(0xB4, 0x08, 0xCD, 0x13)  # get drive params
-    jz("drive_ok")
+    jnc("drive_ok")
     print_msg("missing_msg")
     b(0x5A, 0xC3)
     label("drive_ok")
