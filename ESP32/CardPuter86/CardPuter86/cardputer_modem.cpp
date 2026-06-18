@@ -308,6 +308,17 @@ const char *cardputer_modem_wifi_ssid(void) {
     return wifi_ssid;
 }
 
+void cardputer_modem_pause_wifi(void) {
+    if (tcp_client.connected()) tcp_client.stop();
+    command_mode = true;
+    wifi_started = false;
+    WiFi.disconnect(false, false);
+}
+
+void cardputer_modem_resume_wifi(void) {
+    if (wifi_ssid[0] != '\0') start_wifi();
+}
+
 bool cardputer_modem_port(uint16_t port) {
     return port >= COM1_BASE && port <= COM1_BASE + 7;
 }

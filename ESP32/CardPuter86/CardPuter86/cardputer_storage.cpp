@@ -540,13 +540,27 @@ static bool input_text(const char *title, const char *prompt, char *out,
 
 static bool show_wifi_modem_menu(void) {
     show_probe_status("Scanning WiFi...", "Please wait");
+    cardputer_modem_pause_wifi();
+    WiFi.scanDelete();
     WiFi.mode(WIFI_STA);
-    WiFi.disconnect(false);
-    delay(100);
-    const int count = WiFi.scanNetworks(false, true);
+    WiFi.setSleep(false);
+    WiFi.disconnect(false, false);
+    delay(350);
+
+    int count = WiFi.scanNetworks(false, true, false, 500);
     if (count <= 0) {
-        show_probe_status("No WiFi networks found", "Try again near an AP");
-        delay(1500);
+        WiFi.scanDelete();
+        show_probe_status("Retrying WiFi scan...", "Passive scan");
+        delay(200);
+        count = WiFi.scanNetworks(false, true, true, 700);
+    }
+    if (count <= 0) {
+        char hint[48];
+        snprintf(hint, sizeof(hint), "scan result=%d", count);
+        show_probe_status("No WiFi networks found", hint);
+        delay(2200);
+        WiFi.scanDelete();
+        cardputer_modem_resume_wifi();
         return false;
     }
 
@@ -563,6 +577,7 @@ static bool show_wifi_modem_menu(void) {
     const uint8_t choice = choose_menu("WiFi modem AP", items, shown, 0, false);
     if (choice == MENU_CANCEL) {
         WiFi.scanDelete();
+        cardputer_modem_resume_wifi();
         return false;
     }
 
@@ -574,6 +589,7 @@ static bool show_wifi_modem_menu(void) {
 
     if (!open) {
         if (!input_text("WiFi password", ssid, pass, sizeof(pass), true)) {
+            cardputer_modem_resume_wifi();
             return false;
         }
     }
@@ -581,6 +597,7 @@ static bool show_wifi_modem_menu(void) {
     if (!cardputer_modem_save_wifi(ssid, pass)) {
         show_probe_status("WiFi save failed", "NVS write error");
         delay(1500);
+        cardputer_modem_resume_wifi();
         return false;
     }
     show_probe_status("WiFi saved", ssid);
