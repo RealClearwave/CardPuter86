@@ -6,13 +6,13 @@
 #include "cardputer_rtc.h"
 #include "cardputer_settings.h"
 #include "cardputer_modem.h"
+#include "gbGlobals.h"
 #include <Arduino.h>
 #include <M5Cardputer.h>
 #include <SD.h>
 #include <USB.h>
 #include <USBCDC.h>
 #include <USBMSC.h>
-#include <WiFi.h>
 #include <dirent.h>
 #include <stdio.h>
 #include <strings.h>
@@ -539,59 +539,23 @@ static bool input_text(const char *title, const char *prompt, char *out,
 }
 
 static bool show_wifi_modem_menu(void) {
-    show_probe_status("Scanning WiFi...", "Please wait");
     cardputer_modem_pause_wifi();
-    WiFi.scanDelete();
-    WiFi.mode(WIFI_STA);
-    WiFi.setSleep(false);
-    WiFi.disconnect(false, false);
-    delay(350);
-
-    int count = WiFi.scanNetworks(false, true, false, 500);
-    if (count <= 0) {
-        WiFi.scanDelete();
-        show_probe_status("Retrying WiFi scan...", "Passive scan");
-        delay(200);
-        count = WiFi.scanNetworks(false, true, true, 700);
-    }
-    if (count <= 0) {
-        char hint[48];
-        snprintf(hint, sizeof(hint), "scan result=%d", count);
-        show_probe_status("No WiFi networks found", hint);
-        delay(2200);
-        WiFi.scanDelete();
-        cardputer_modem_resume_wifi();
-        return false;
-    }
-
-    static char labels[12][40];
-    const char *items[12];
-    const uint8_t shown = count > 12 ? 12 : count;
-    for (uint8_t i = 0; i < shown; i++) {
-        const bool open = WiFi.encryptionType(i) == WIFI_AUTH_OPEN;
-        snprintf(labels[i], sizeof(labels[i]), "%-24.24s %4d %s",
-                 WiFi.SSID(i).c_str(), WiFi.RSSI(i), open ? "open" : "lock");
-        items[i] = labels[i];
-    }
-
-    const uint8_t choice = choose_menu("WiFi modem AP", items, shown, 0, false);
-    if (choice == MENU_CANCEL) {
-        WiFi.scanDelete();
-        cardputer_modem_resume_wifi();
-        return false;
-    }
-
-    char ssid[33];
+    char ssid[33] = {};
     char pass[65] = {};
-    strlcpy(ssid, WiFi.SSID(choice).c_str(), sizeof(ssid));
-    const bool open = WiFi.encryptionType(choice) == WIFI_AUTH_OPEN;
-    WiFi.scanDelete();
-
-    if (!open) {
-        if (!input_text("WiFi password", ssid, pass, sizeof(pass), true)) {
-            cardputer_modem_resume_wifi();
-            return false;
-        }
+    if (!input_text("WiFi SSID", "Enter SSID", ssid, sizeof(ssid), false)) {
+        cardputer_modem_resume_wifi();
+        return false;
+    }
+    if (ssid[0] == '\0') {
+        show_probe_status("WiFi SSID empty", "Configuration skipped");
+        delay(1200);
+        cardputer_modem_resume_wifi();
+        return false;
+    }
+    if (!input_text("WiFi password", "Empty OK for open AP",
+                    pass, sizeof(pass), true)) {
+        cardputer_modem_resume_wifi();
+        return false;
     }
 
     if (!cardputer_modem_save_wifi(ssid, pass)) {
@@ -1123,7 +1087,8 @@ bool cardputer_storage_show_settings_menu(bool allow_usb_disk) {
     while (true) {
         char ram_item[32];
         char cpu_item[32];
-        char sound_item[32];
+        char audio_item[32];
+        char com1_item[40];
         char sleep_item[32];
         char sleep_led_item[32];
         char rtc_item[40];
@@ -1134,8 +1099,10 @@ bool cardputer_storage_show_settings_menu(bool allow_usb_disk) {
                  guest_memory_512k_enabled() ? "Enabled" : "Disabled");
         snprintf(cpu_item, sizeof(cpu_item), "CPU speed: %s",
                  cardputer_cpu_profile_label(cardputer_cpu_profile()));
-        snprintf(sound_item, sizeof(sound_item), "POST sound: %s",
-                 cardputer_settings_post_sound_enabled() ? "Enabled" : "Disabled");
+        snprintf(audio_item, sizeof(audio_item), "Audio: %s",
+                 cardputer_settings_audio_enabled() ? "Enabled" : "Disabled");
+        snprintf(com1_item, sizeof(com1_item), "Network COM1: %s",
+                 cardputer_settings_com1_enabled() ? "Enabled" : "Disabled");
         const uint32_t sleep_seconds = cardputer_settings_sleep_timeout_seconds();
         if (sleep_seconds == 0) {
             snprintf(sleep_item, sizeof(sleep_item), "Sleep timeout: Never");
@@ -1159,13 +1126,21 @@ bool cardputer_storage_show_settings_menu(bool allow_usb_disk) {
                  cardputer_modem_wifi_connected() ? "Connected" :
                  (cardputer_modem_wifi_configured() ? "Configured" : "Not set"));
         const char *items[] = {
-            usb_item, mount_item, wifi_item, ram_item, cpu_item, sound_item,
-            sleep_item, sleep_led_item, rtc_item, "Continue"
+            mount_item, wifi_item, usb_item, audio_item, com1_item,
+            "More settings", "Continue"
         };
         const uint8_t choice = choose_menu(
-            "CardPuter86 Settings", items, 10, 0, false);
+            "CardPuter86 Settings", items, 7, 0, false);
         if (choice == MENU_CANCEL) return false;
         if (choice == 0) {
+            cardputer_storage_show_mount_menu();
+            continue;
+        }
+        if (choice == 1) {
+            show_wifi_modem_menu();
+            continue;
+        }
+        if (choice == 2) {
             const char *usb_modes[] = {"Charge only", "Serial CDC", "USB disk"};
             uint8_t mode = choose_menu("USB interface", usb_modes, 3,
                                        cardputer_settings_usb_mode(), false);
@@ -1182,118 +1157,130 @@ bool cardputer_storage_show_settings_menu(bool allow_usb_disk) {
             delay(1500);
             continue;
         }
-        if (choice == 1) {
-            cardputer_storage_show_mount_menu();
-            continue;
-        }
-        if (choice == 2) {
-            show_wifi_modem_menu();
-            continue;
-        }
         if (choice == 3) {
-            const bool enable = !guest_memory_512k_enabled();
-            if (!guest_memory_set_512k_enabled(enable)) {
-                show_probe_status("512 KB mode failed", "Swap partition unavailable");
+            const bool enable = !cardputer_settings_audio_enabled();
+            if (!cardputer_settings_set_audio_enabled(enable)) {
+                show_probe_status("Audio setting failed", "NVS write error");
                 delay(1500);
             }
+            gb_silence = enable ? 0 : 1;
             continue;
         }
         if (choice == 4) {
-            const char *cpu_profiles[] = {
-                "4.77 MHz (IBM PC)", "8 MHz", "10 MHz", "12 MHz",
-                "Unlimited (fastest)", "16 MHz", "24 MHz", "33 MHz"
-            };
-            const uint8_t profile = choose_menu(
-                "CPU speed", cpu_profiles, cardputer_cpu_profile_count(),
-                cardputer_cpu_profile(), false);
-            if (profile == MENU_CANCEL) continue;
-            if (!cardputer_cpu_set_profile(profile)) {
-                show_probe_status("CPU setting failed", "NVS write error");
+            const bool enable = !cardputer_settings_com1_enabled();
+            if (!cardputer_settings_set_com1_enabled(enable)) {
+                show_probe_status("COM1 setting failed", "NVS write error");
                 delay(1500);
             }
             continue;
         }
         if (choice == 5) {
-            const bool enable = !cardputer_settings_post_sound_enabled();
-            if (!cardputer_settings_set_post_sound_enabled(enable)) {
-                show_probe_status("POST sound failed", "NVS write error");
-                delay(1500);
-            }
-            continue;
-        }
-        if (choice == 6) {
-            const char *sleep_profiles[] = {
-                "30 seconds", "2 minutes", "5 minutes", "10 minutes", "Never"
-            };
-            const uint32_t sleep_values[] = {30, 120, 300, 600, 0};
-            uint8_t selected = 1;
-            for (uint8_t i = 0; i < 5; i++) {
-                if (sleep_values[i] == cardputer_settings_sleep_timeout_seconds()) {
-                    selected = i;
-                    break;
-                }
-            }
-            const uint8_t profile = choose_menu(
-                "Sleep timeout", sleep_profiles, 5, selected, false);
-            if (profile == MENU_CANCEL) continue;
-            if (!cardputer_settings_set_sleep_timeout_seconds(sleep_values[profile])) {
-                show_probe_status("Sleep setting failed", "NVS write error");
-                delay(1500);
-            }
-            continue;
-        }
-        if (choice == 7) {
-            const bool enable = !cardputer_settings_sleep_led_enabled();
-            if (!cardputer_settings_set_sleep_led_enabled(enable)) {
-                show_probe_status("Sleep LED failed", "NVS write error");
-                delay(1500);
-            }
-            continue;
-        }
-        if (choice == 8) {
-            char input[15] = {};
-            uint8_t pos = 0;
             while (true) {
-                auto &display = M5Cardputer.Display;
-                display.fillScreen(TFT_BLACK);
-                display.fillRect(0, 0, display.width(), 16, TFT_BLUE);
-                display.setTextColor(TFT_WHITE, TFT_BLUE);
-                display.setCursor(4, 4);
-                display.print("Set RTC");
-                display.setTextColor(TFT_WHITE, TFT_BLACK);
-                display.setCursor(6, 30);
-                display.print("YYYYMMDDhhmmss");
-                display.setCursor(6, 48);
-                display.print(input);
-                display.setTextColor(TFT_YELLOW, TFT_BLACK);
-                display.setCursor(6, 70);
-                display.print("Enter=save Backspace=del");
-                display.setCursor(6, 84);
-                display.print("Esc=cancel");
-
-                M5Cardputer.update();
-                const char digit = cardputer_input_consume_digit();
-                if (digit != 0 && pos < 14) {
-                    input[pos++] = digit;
-                    input[pos] = '\0';
-                }
-                if (cardputer_input_consume(CARDPUTER_VK_BACKSPACE) && pos > 0) {
-                    input[--pos] = '\0';
-                }
-                if (cardputer_input_consume(CARDPUTER_VK_ESC) ||
-                    cardputer_input_consume_char('`')) break;
-                if (cardputer_input_consume(CARDPUTER_VK_ENTER)) {
-                    CardputerRtcTime rtc_time;
-                    if (cardputer_rtc_parse_yyyymmddhhmmss(input, &rtc_time) &&
-                        cardputer_rtc_set(rtc_time)) {
-                        show_probe_status("RTC updated", input);
-                    } else {
-                        show_probe_status("RTC update failed", "Use YYYYMMDDhhmmss");
+                const char *more_items[] = {
+                    ram_item, cpu_item, sleep_item, sleep_led_item, rtc_item, "Back"
+                };
+                const uint8_t more_choice = choose_menu(
+                    "More settings", more_items, 6, 0, false);
+                if (more_choice == MENU_CANCEL || more_choice == 5) break;
+                if (more_choice == 0) {
+                    const bool enable = !guest_memory_512k_enabled();
+                    if (!guest_memory_set_512k_enabled(enable)) {
+                        show_probe_status("512 KB mode failed", "Swap partition unavailable");
+                        delay(1500);
                     }
-                    delay(1500);
                     break;
                 }
-                delay(20);
+                if (more_choice == 1) {
+                    const char *cpu_profiles[] = {
+                        "4.77 MHz (IBM PC)", "8 MHz", "10 MHz", "12 MHz",
+                        "Unlimited (fastest)", "16 MHz", "24 MHz", "33 MHz"
+                    };
+                    const uint8_t profile = choose_menu(
+                        "CPU speed", cpu_profiles, cardputer_cpu_profile_count(),
+                        cardputer_cpu_profile(), false);
+                    if (profile != MENU_CANCEL &&
+                        !cardputer_cpu_set_profile(profile)) {
+                        show_probe_status("CPU setting failed", "NVS write error");
+                        delay(1500);
+                    }
+                    break;
+                }
+                if (more_choice == 2) {
+                    const char *sleep_profiles[] = {
+                        "30 seconds", "2 minutes", "5 minutes", "10 minutes", "Never"
+                    };
+                    const uint32_t sleep_values[] = {30, 120, 300, 600, 0};
+                    uint8_t selected = 1;
+                    for (uint8_t i = 0; i < 5; i++) {
+                        if (sleep_values[i] == cardputer_settings_sleep_timeout_seconds()) {
+                            selected = i;
+                            break;
+                        }
+                    }
+                    const uint8_t profile = choose_menu(
+                        "Sleep timeout", sleep_profiles, 5, selected, false);
+                    if (profile != MENU_CANCEL &&
+                        !cardputer_settings_set_sleep_timeout_seconds(sleep_values[profile])) {
+                        show_probe_status("Sleep setting failed", "NVS write error");
+                        delay(1500);
+                    }
+                    break;
+                }
+                if (more_choice == 3) {
+                    const bool enable = !cardputer_settings_sleep_led_enabled();
+                    if (!cardputer_settings_set_sleep_led_enabled(enable)) {
+                        show_probe_status("Sleep LED failed", "NVS write error");
+                        delay(1500);
+                    }
+                    break;
+                }
+                if (more_choice == 4) {
+                    char input[15] = {};
+                    uint8_t pos = 0;
+                    while (true) {
+                        auto &display = M5Cardputer.Display;
+                        display.fillScreen(TFT_BLACK);
+                        display.fillRect(0, 0, display.width(), 16, TFT_BLUE);
+                        display.setTextColor(TFT_WHITE, TFT_BLUE);
+                        display.setCursor(4, 4);
+                        display.print("Set RTC");
+                        display.setTextColor(TFT_WHITE, TFT_BLACK);
+                        display.setCursor(6, 30);
+                        display.print("YYYYMMDDhhmmss");
+                        display.setCursor(6, 48);
+                        display.print(input);
+                        display.setTextColor(TFT_YELLOW, TFT_BLACK);
+                        display.setCursor(6, 70);
+                        display.print("Enter=save Backspace=del");
+                        display.setCursor(6, 84);
+                        display.print("Esc=cancel");
+
+                        M5Cardputer.update();
+                        const char digit = cardputer_input_consume_digit();
+                        if (digit != 0 && pos < 14) {
+                            input[pos++] = digit;
+                            input[pos] = '\0';
+                        }
+                        if (cardputer_input_consume(CARDPUTER_VK_BACKSPACE) && pos > 0) {
+                            input[--pos] = '\0';
+                        }
+                        if (cardputer_input_consume(CARDPUTER_VK_ESC) ||
+                            cardputer_input_consume_char('`')) break;
+                        if (cardputer_input_consume(CARDPUTER_VK_ENTER)) {
+                            CardputerRtcTime rtc_time;
+                            if (cardputer_rtc_parse_yyyymmddhhmmss(input, &rtc_time) &&
+                                cardputer_rtc_set(rtc_time)) {
+                                show_probe_status("RTC updated", input);
+                            } else {
+                                show_probe_status("RTC update failed", "Use YYYYMMDDhhmmss");
+                            }
+                            delay(1500);
+                            break;
+                        }
+                        delay(20);
+                    }
+                    break;
+                }
             }
             continue;
         }

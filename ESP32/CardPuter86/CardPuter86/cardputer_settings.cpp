@@ -2,24 +2,23 @@
 #include <nvs.h>
 #include <nvs_flash.h>
 
-static bool post_sound_enabled = false;
 static uint32_t sleep_timeout_seconds = 120;
 static uint8_t usb_mode = 0; // 0 charge only, 1 CDC serial, 2 USB disk
 static bool sleep_led_enabled = true;
+static bool audio_enabled = true;
+static bool com1_enabled = true;
 
 void cardputer_settings_init(void) {
-    post_sound_enabled = false;
     sleep_timeout_seconds = 120;
     usb_mode = 0;
     sleep_led_enabled = true;
+    audio_enabled = true;
+    com1_enabled = true;
     if (nvs_flash_init() != ESP_OK) return;
 
     nvs_handle_t handle;
     if (nvs_open("cardputer86", NVS_READONLY, &handle) != ESP_OK) return;
     uint8_t saved = 0;
-    if (nvs_get_u8(handle, "post_sound", &saved) == ESP_OK) {
-        post_sound_enabled = saved != 0;
-    }
     uint32_t saved_sleep = 120;
     if (nvs_get_u32(handle, "sleep_sec", &saved_sleep) == ESP_OK &&
         (saved_sleep == 0 || saved_sleep == 30 || saved_sleep == 120 ||
@@ -34,22 +33,15 @@ void cardputer_settings_init(void) {
     if (nvs_get_u8(handle, "sleep_led", &saved_sleep_led) == ESP_OK) {
         sleep_led_enabled = saved_sleep_led != 0;
     }
+    uint8_t saved_audio = 1;
+    if (nvs_get_u8(handle, "audio", &saved_audio) == ESP_OK) {
+        audio_enabled = saved_audio != 0;
+    }
+    uint8_t saved_com1 = 1;
+    if (nvs_get_u8(handle, "com1", &saved_com1) == ESP_OK) {
+        com1_enabled = saved_com1 != 0;
+    }
     nvs_close(handle);
-}
-
-bool cardputer_settings_post_sound_enabled(void) {
-    return post_sound_enabled;
-}
-
-bool cardputer_settings_set_post_sound_enabled(bool enabled) {
-    post_sound_enabled = enabled;
-
-    nvs_handle_t handle;
-    if (nvs_open("cardputer86", NVS_READWRITE, &handle) != ESP_OK) return false;
-    const esp_err_t result = nvs_set_u8(handle, "post_sound", enabled ? 1 : 0);
-    const esp_err_t commit_result = result == ESP_OK ? nvs_commit(handle) : result;
-    nvs_close(handle);
-    return result == ESP_OK && commit_result == ESP_OK;
 }
 
 bool cardputer_settings_sleep_led_enabled(void) {
@@ -62,6 +54,36 @@ bool cardputer_settings_set_sleep_led_enabled(bool enabled) {
     nvs_handle_t handle;
     if (nvs_open("cardputer86", NVS_READWRITE, &handle) != ESP_OK) return false;
     const esp_err_t result = nvs_set_u8(handle, "sleep_led", enabled ? 1 : 0);
+    const esp_err_t commit_result = result == ESP_OK ? nvs_commit(handle) : result;
+    nvs_close(handle);
+    return result == ESP_OK && commit_result == ESP_OK;
+}
+
+bool cardputer_settings_audio_enabled(void) {
+    return audio_enabled;
+}
+
+bool cardputer_settings_set_audio_enabled(bool enabled) {
+    audio_enabled = enabled;
+
+    nvs_handle_t handle;
+    if (nvs_open("cardputer86", NVS_READWRITE, &handle) != ESP_OK) return false;
+    const esp_err_t result = nvs_set_u8(handle, "audio", enabled ? 1 : 0);
+    const esp_err_t commit_result = result == ESP_OK ? nvs_commit(handle) : result;
+    nvs_close(handle);
+    return result == ESP_OK && commit_result == ESP_OK;
+}
+
+bool cardputer_settings_com1_enabled(void) {
+    return com1_enabled;
+}
+
+bool cardputer_settings_set_com1_enabled(bool enabled) {
+    com1_enabled = enabled;
+
+    nvs_handle_t handle;
+    if (nvs_open("cardputer86", NVS_READWRITE, &handle) != ESP_OK) return false;
+    const esp_err_t result = nvs_set_u8(handle, "com1", enabled ? 1 : 0);
     const esp_err_t commit_result = result == ESP_OK ? nvs_commit(handle) : result;
     nvs_close(handle);
     return result == ESP_OK && commit_result == ESP_OK;

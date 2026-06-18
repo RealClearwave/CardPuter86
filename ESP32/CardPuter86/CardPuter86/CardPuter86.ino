@@ -486,9 +486,6 @@ void setup() {
 
     // Initialize I2S speaker
     cardputer_speaker_init();
-    if (cardputer_settings_post_sound_enabled()) {
-        cardputer_speaker_self_test();
-    }
 
     // BIOS data area: number of installed hard disks.
     hdcount = cardputer_storage_hard_drive_count();

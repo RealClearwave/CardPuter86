@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <nvs.h>
+#include "cardputer_settings.h"
 
 // Minimal COM1 8250/16550 + Hayes modem. Keep this deliberately small:
 // no PPP, no DNS cache, no terminal UI, no dynamic buffers.
@@ -104,6 +105,7 @@ bool cardputer_modem_save_wifi(const char *ssid, const char *pass) {
 }
 
 static void start_wifi(void) {
+    if (!cardputer_settings_com1_enabled()) return;
     if (wifi_ssid[0] == '\0') return;
     WiFi.mode(WIFI_STA);
     WiFi.setSleep(false);
@@ -132,7 +134,7 @@ static void parse_wifi_command(const char *args) {
         return;
     }
 
-    result("USE SETTINGS WIFI SCAN");
+    result("USE SETTINGS WIFI CONFIG");
 }
 
 static void dial_tcp(const char *target) {
@@ -280,6 +282,10 @@ void cardputer_modem_init(void) {
 }
 
 void cardputer_modem_poll(void) {
+    if (!cardputer_settings_com1_enabled()) {
+        if (tcp_client.connected()) tcp_client.stop();
+        return;
+    }
     if (wifi_started && WiFi.status() != WL_CONNECTED &&
         millis() - last_wifi_attempt_ms > 15000) {
         last_wifi_attempt_ms = millis();
@@ -320,7 +326,8 @@ void cardputer_modem_resume_wifi(void) {
 }
 
 bool cardputer_modem_port(uint16_t port) {
-    return port >= COM1_BASE && port <= COM1_BASE + 7;
+    return cardputer_settings_com1_enabled() &&
+        port >= COM1_BASE && port <= COM1_BASE + 7;
 }
 
 void cardputer_modem_write(uint16_t port, uint8_t value) {
