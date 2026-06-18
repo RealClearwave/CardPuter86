@@ -38,18 +38,14 @@ extern void write86 (uint32_t addr32, uint8_t value);
 unsigned char sectorbuffer[512];
 
 static bool is_image_drive(uint8_t drivenum) {
- return gb_disk_image.mounted && gb_disk_image.drive == drivenum;
+ uint16_t cylinders;
+ uint8_t heads, sectors;
+ return cardputer_storage_drive_geometry(drivenum, &cylinders, &heads, &sectors);
 }
 
 static bool drive_geometry(uint8_t drivenum, uint16_t *cylinders,
                            uint8_t *heads, uint8_t *sectors) {
- if (is_image_drive(drivenum)) {
-  *cylinders = gb_disk_image.cylinders;
-  *heads = gb_disk_image.heads;
-  *sectors = gb_disk_image.sectors;
-  return true;
- }
- return false;
+ return cardputer_storage_drive_geometry(drivenum, cylinders, heads, sectors);
 }
 
 //JJuint8_t insertdisk (uint8_t drivenum, char *filename)
@@ -89,7 +85,11 @@ void readdisk (uint8_t drivenum, uint16_t dstseg, uint16_t dstoff, uint16_t cyl,
  }
  lba = ((uint32_t)cyl * heads + head) * sectors + sect - 1;
  fileoffset = lba * 512;
- uint32_t disk_size = gb_disk_image.size;
+ const int8_t slot = (drivenum == 0x00 ? 0 :
+                      drivenum == 0x01 ? 1 :
+                      drivenum == 0x80 ? 2 :
+                      drivenum == 0x81 ? 3 : -1);
+ uint32_t disk_size = slot >= 0 ? gb_disk_drives[slot].size : 0;
  if (fileoffset + 512 > disk_size) {
   ExternalSetCF(1); regs.byteregs[regah] = 4; return;
  }
@@ -108,7 +108,7 @@ void readdisk (uint8_t drivenum, uint16_t dstseg, uint16_t dstoff, uint16_t cyl,
   //memcpy(sectorbuffer,&gb_dsk_compaq211madmix[fileoffset],512);
   //memcpy(sectorbuffer,&gb_dsk_solnegro[fileoffset],512);  
   //memcpy(sectorbuffer,&gb_dsk_pakupaku[fileoffset],512);
-  if (!cardputer_storage_read_sector(fileoffset / 512, sectorbuffer)) break;
+  if (!cardputer_storage_read_sector(drivenum, fileoffset / 512, sectorbuffer)) break;
   fileoffset+= 512;
   for (sectoffset=0; sectoffset<512; sectoffset++) {
    write86 (memdest++, sectorbuffer[sectoffset]);
@@ -131,9 +131,14 @@ void writedisk (uint8_t drivenum, uint16_t dstseg, uint16_t dstoff, uint16_t cyl
  uint32_t lba = ((uint32_t)cyl * heads + head) * sectors + sect - 1;
  uint32_t memsrc = ((uint32_t)dstseg << 4) + dstoff;
  uint16_t written = 0;
- for (; written < sectcount && (lba + written) * 512UL < gb_disk_image.size; written++) {
+ const int8_t slot = (drivenum == 0x00 ? 0 :
+                      drivenum == 0x01 ? 1 :
+                      drivenum == 0x80 ? 2 :
+                      drivenum == 0x81 ? 3 : -1);
+ const uint32_t disk_size = slot >= 0 ? gb_disk_drives[slot].size : 0;
+ for (; written < sectcount && (lba + written) * 512UL < disk_size; written++) {
   for (uint16_t i = 0; i < 512; i++) sectorbuffer[i] = read86(memsrc++);
-  if (!cardputer_storage_write_sector(lba + written, sectorbuffer)) break;
+  if (!cardputer_storage_write_sector(drivenum, lba + written, sectorbuffer)) break;
  }
  regs.byteregs[regal] = written;
  ExternalSetCF(written == sectcount ? 0 : 1);
@@ -359,7 +364,7 @@ void diskhandler()
 								regs.byteregs[regbl] = 4; //else regs.byteregs[regbl] = 0;
 								regs.byteregs[regdl] = 2;
 							}
-							else regs.byteregs[regdl] = gb_disk_image.mounted && gb_disk_image.drive == 0x80 ? 1 : 0;
+							else regs.byteregs[regdl] = cardputer_storage_hard_drive_count();
 					}
 				//JJ 	}
 				//JJ else {

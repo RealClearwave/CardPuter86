@@ -3,9 +3,22 @@
 #include "cardputer_settings.h"
 #include "hardware.h"
 #include <M5Cardputer.h>
+#include <esp32-hal-rgb-led.h>
 #include <esp_sleep.h>
 
 static uint32_t last_activity_ms = 0;
+
+static void sleep_led_step(uint8_t step) {
+    if (!cardputer_settings_sleep_led_enabled()) return;
+    static const uint8_t levels[] = {0, 1, 2, 3, 2, 1};
+    // Keep the sleep indicator deliberately dim: max 3/255 blue, updated
+    // only every few light-sleep cycles.
+    neopixelWrite(RGB_LED_PIN, 0, 0, levels[step % (sizeof(levels) / sizeof(levels[0]))]);
+}
+
+static void sleep_led_off(void) {
+    neopixelWrite(RGB_LED_PIN, 0, 0, 0);
+}
 
 static void display_power_off(void) {
     auto &display = M5Cardputer.Display;
@@ -39,7 +52,10 @@ static void enter_light_sleep(void) {
     cardputer_rtc_persist_now();
     display_power_off();
 
+    uint8_t led_step = 0;
+    uint8_t sleep_cycles = 0;
     while (true) {
+        if ((sleep_cycles++ % 4) == 0) sleep_led_step(led_step++);
         esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
         esp_sleep_enable_timer_wakeup(100000ULL);
         esp_light_sleep_start();
@@ -47,6 +63,7 @@ static void enter_light_sleep(void) {
         if (M5Cardputer.Keyboard.isPressed()) break;
     }
 
+    sleep_led_off();
     display_power_on();
     last_activity_ms = millis();
 }

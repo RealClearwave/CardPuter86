@@ -485,10 +485,8 @@ void setup() {
     }
 
     // BIOS data area: number of installed hard disks.
-    if (gb_disk_image.mounted && gb_disk_image.drive == 0x80) {
-        write86(0x475, 1);
-        hdcount = 1;
-    }
+    hdcount = cardputer_storage_hard_drive_count();
+    write86(0x475, hdcount);
 
     // Initialize emulator
     running = 1;
