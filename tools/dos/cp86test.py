@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_IMG = ROOT / "ESP32" / "CardPuter86" / "data" / "cardputer86.img"
+DEFAULT_COM = ROOT / "tools" / "dos" / "image_root" / "CP86TEST.COM"
 
 
 def emit_com() -> bytes:
@@ -481,15 +482,21 @@ def update_file(img_path: Path, dos_name: str, payload: bytes | None) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--image", type=Path, default=DEFAULT_IMG)
-    parser.add_argument("--write-com", type=Path)
+    parser.add_argument("--write-com", type=Path, default=DEFAULT_COM)
+    parser.add_argument("--update-image", action="store_true",
+                        help="legacy path: patch CP86TEST.COM into an existing image")
     args = parser.parse_args()
 
     payload = emit_com()
     if args.write_com:
+        args.write_com.parent.mkdir(parents=True, exist_ok=True)
         args.write_com.write_bytes(payload)
-    update_file(args.image, "SND" "TEST COM", None)
-    update_file(args.image, "CP86TESTCOM", payload)
-    print(f"Installed CP86TEST.COM ({len(payload)} bytes) into {args.image}; removed legacy speaker test")
+    if args.update_image:
+        update_file(args.image, "SND" "TEST COM", None)
+        update_file(args.image, "CP86TESTCOM", payload)
+        print(f"Installed CP86TEST.COM ({len(payload)} bytes) into {args.image}; removed legacy speaker test")
+    else:
+        print(f"Wrote CP86TEST.COM ({len(payload)} bytes) to {args.write_com}")
 
 
 if __name__ == "__main__":

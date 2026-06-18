@@ -78,6 +78,11 @@ echo " CardPuter86 Flash Tool"
 echo "======================================="
 echo ""
 
+# 0. Build default DOS image from the source directory.
+echo "[BUILD] Preparing default DOS image..."
+python3 "$SCRIPT_DIR/tools/dos/build_image.py" --prepare-source
+echo ""
+
 # 1. Build
 echo "[BUILD] Compiling..."
 "$PIO_BIN" run --project-dir "$PROJECT_DIR" --environment "$PIO_ENV"
