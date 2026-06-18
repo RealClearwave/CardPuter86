@@ -343,9 +343,9 @@ bool cardputer_modem_port(uint16_t port) {
 
 void cardputer_modem_write(uint16_t port, uint8_t value) {
     const uint8_t reg = port - COM1_BASE;
-    if (lcr & 0x80) {
+    if ((lcr & 0x80) && reg <= 1) {
         if (reg == 0) divisor = (divisor & 0xFF00) | value;
-        else if (reg == 1) divisor = (divisor & 0x00FF) | ((uint16_t)value << 8);
+        else divisor = (divisor & 0x00FF) | ((uint16_t)value << 8);
         return;
     }
 
