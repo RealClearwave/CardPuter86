@@ -5,12 +5,14 @@
 #include "cardputer_input.h"
 #include "cardputer_rtc.h"
 #include "cardputer_settings.h"
+#include "cardputer_modem.h"
 #include <Arduino.h>
 #include <M5Cardputer.h>
 #include <SD.h>
 #include <USB.h>
 #include <USBCDC.h>
 #include <USBMSC.h>
+#include <WiFi.h>
 #include <dirent.h>
 #include <stdio.h>
 #include <strings.h>
@@ -476,6 +478,114 @@ static uint8_t choose_menu(const char *title, const char *const *items,
         }
         delay(15);
     }
+}
+
+static char consume_printable_char(void) {
+    for (char key = 32; key < 127; key++) {
+        if (cardputer_input_consume_char(key)) return key;
+    }
+    return 0;
+}
+
+static bool input_text(const char *title, const char *prompt, char *out,
+                       size_t out_size, bool mask) {
+    if (!out || out_size == 0) return false;
+    out[0] = '\0';
+    uint8_t pos = 0;
+    do {
+        M5Cardputer.update();
+        if (!M5Cardputer.Keyboard.isPressed()) break;
+        delay(10);
+    } while (true);
+
+    while (true) {
+        auto &display = M5Cardputer.Display;
+        display.fillScreen(TFT_BLACK);
+        display.fillRect(0, 0, display.width(), 16, TFT_BLUE);
+        display.setTextColor(TFT_WHITE, TFT_BLUE);
+        display.setCursor(4, 4);
+        display.print(title);
+        display.setTextColor(TFT_WHITE, TFT_BLACK);
+        display.setCursor(6, 28);
+        display.print(prompt);
+        display.setCursor(6, 48);
+        if (mask) {
+            for (uint8_t i = 0; i < pos; i++) display.print('*');
+        } else {
+            display.print(out);
+        }
+        display.setTextColor(TFT_YELLOW, TFT_BLACK);
+        display.setCursor(6, 78);
+        display.print("Enter=save Backspace=del");
+        display.setCursor(6, 92);
+        display.print("Esc=cancel");
+
+        M5Cardputer.update();
+        if (cardputer_input_consume(CARDPUTER_VK_ESC) ||
+            cardputer_input_consume_char('`')) {
+            return false;
+        }
+        if (cardputer_input_consume(CARDPUTER_VK_BACKSPACE) && pos > 0) {
+            out[--pos] = '\0';
+        }
+        if (cardputer_input_consume(CARDPUTER_VK_ENTER)) return true;
+        const char c = consume_printable_char();
+        if (c && pos + 1 < out_size) {
+            out[pos++] = c;
+            out[pos] = '\0';
+        }
+        delay(20);
+    }
+}
+
+static bool show_wifi_modem_menu(void) {
+    show_probe_status("Scanning WiFi...", "Please wait");
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect(false);
+    delay(100);
+    const int count = WiFi.scanNetworks(false, true);
+    if (count <= 0) {
+        show_probe_status("No WiFi networks found", "Try again near an AP");
+        delay(1500);
+        return false;
+    }
+
+    static char labels[12][40];
+    const char *items[12];
+    const uint8_t shown = count > 12 ? 12 : count;
+    for (uint8_t i = 0; i < shown; i++) {
+        const bool open = WiFi.encryptionType(i) == WIFI_AUTH_OPEN;
+        snprintf(labels[i], sizeof(labels[i]), "%-24.24s %4d %s",
+                 WiFi.SSID(i).c_str(), WiFi.RSSI(i), open ? "open" : "lock");
+        items[i] = labels[i];
+    }
+
+    const uint8_t choice = choose_menu("WiFi modem AP", items, shown, 0, false);
+    if (choice == MENU_CANCEL) {
+        WiFi.scanDelete();
+        return false;
+    }
+
+    char ssid[33];
+    char pass[65] = {};
+    strlcpy(ssid, WiFi.SSID(choice).c_str(), sizeof(ssid));
+    const bool open = WiFi.encryptionType(choice) == WIFI_AUTH_OPEN;
+    WiFi.scanDelete();
+
+    if (!open) {
+        if (!input_text("WiFi password", ssid, pass, sizeof(pass), true)) {
+            return false;
+        }
+    }
+
+    if (!cardputer_modem_save_wifi(ssid, pass)) {
+        show_probe_status("WiFi save failed", "NVS write error");
+        delay(1500);
+        return false;
+    }
+    show_probe_status("WiFi saved", ssid);
+    delay(1500);
+    return true;
 }
 
 static bool close_drive(uint8_t drive) {
@@ -1002,6 +1112,7 @@ bool cardputer_storage_show_settings_menu(bool allow_usb_disk) {
         char rtc_item[40];
         char mount_item[32];
         char usb_item[40];
+        char wifi_item[40];
         snprintf(ram_item, sizeof(ram_item), "512 KB memory: %s",
                  guest_memory_512k_enabled() ? "Enabled" : "Disabled");
         snprintf(cpu_item, sizeof(cpu_item), "CPU speed: %s",
@@ -1027,12 +1138,15 @@ bool cardputer_storage_show_settings_menu(bool allow_usb_disk) {
         const char *usb_labels[] = {"Charge only", "Serial CDC", "USB disk"};
         snprintf(usb_item, sizeof(usb_item), "USB interface: %s",
                  usb_labels[cardputer_settings_usb_mode()]);
+        snprintf(wifi_item, sizeof(wifi_item), "WiFi modem: %s",
+                 cardputer_modem_wifi_connected() ? "Connected" :
+                 (cardputer_modem_wifi_configured() ? "Configured" : "Not set"));
         const char *items[] = {
-            usb_item, mount_item, ram_item, cpu_item, sound_item,
+            usb_item, mount_item, wifi_item, ram_item, cpu_item, sound_item,
             sleep_item, sleep_led_item, rtc_item, "Continue"
         };
         const uint8_t choice = choose_menu(
-            "CardPuter86 Settings", items, 9, 0, false);
+            "CardPuter86 Settings", items, 10, 0, false);
         if (choice == MENU_CANCEL) return false;
         if (choice == 0) {
             const char *usb_modes[] = {"Charge only", "Serial CDC", "USB disk"};
@@ -1056,6 +1170,10 @@ bool cardputer_storage_show_settings_menu(bool allow_usb_disk) {
             continue;
         }
         if (choice == 2) {
+            show_wifi_modem_menu();
+            continue;
+        }
+        if (choice == 3) {
             const bool enable = !guest_memory_512k_enabled();
             if (!guest_memory_set_512k_enabled(enable)) {
                 show_probe_status("512 KB mode failed", "Swap partition unavailable");
@@ -1063,7 +1181,7 @@ bool cardputer_storage_show_settings_menu(bool allow_usb_disk) {
             }
             continue;
         }
-        if (choice == 3) {
+        if (choice == 4) {
             const char *cpu_profiles[] = {
                 "4.77 MHz (IBM PC)", "8 MHz", "10 MHz", "12 MHz",
                 "Unlimited (fastest)", "16 MHz", "24 MHz", "33 MHz"
@@ -1078,7 +1196,7 @@ bool cardputer_storage_show_settings_menu(bool allow_usb_disk) {
             }
             continue;
         }
-        if (choice == 4) {
+        if (choice == 5) {
             const bool enable = !cardputer_settings_post_sound_enabled();
             if (!cardputer_settings_set_post_sound_enabled(enable)) {
                 show_probe_status("POST sound failed", "NVS write error");
@@ -1086,7 +1204,7 @@ bool cardputer_storage_show_settings_menu(bool allow_usb_disk) {
             }
             continue;
         }
-        if (choice == 5) {
+        if (choice == 6) {
             const char *sleep_profiles[] = {
                 "30 seconds", "2 minutes", "5 minutes", "10 minutes", "Never"
             };
@@ -1107,7 +1225,7 @@ bool cardputer_storage_show_settings_menu(bool allow_usb_disk) {
             }
             continue;
         }
-        if (choice == 6) {
+        if (choice == 7) {
             const bool enable = !cardputer_settings_sleep_led_enabled();
             if (!cardputer_settings_set_sleep_led_enabled(enable)) {
                 show_probe_status("Sleep LED failed", "NVS write error");
@@ -1115,7 +1233,7 @@ bool cardputer_storage_show_settings_menu(bool allow_usb_disk) {
             }
             continue;
         }
-        if (choice == 7) {
+        if (choice == 8) {
             char input[15] = {};
             uint8_t pos = 0;
             while (true) {

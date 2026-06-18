@@ -27,6 +27,7 @@
 #include "ports.h"
 #include "cardputer_rtc.h"
 #include "cardputer_speaker.h"
+#include "cardputer_modem.h"
 #include "i8253.h"
 
 //Lista puertos
@@ -136,7 +137,16 @@ void portout (uint16_t portnum, uint8_t value)
 {
  unsigned char auxIdport;        
  if (portnum >= (gb_max_portram-1))
+ {
+  if (cardputer_modem_port(portnum)) {
+   cardputer_modem_write(portnum, value);
+  }
   return;     
+ }
+ if (cardputer_modem_port(portnum)) {
+  cardputer_modem_write(portnum, value);
+  return;
+ }
     #ifdef use_lib_limit_portram 
      if (portnum<gb_max_portram)
      {
@@ -177,7 +187,15 @@ uint8_t portin (uint16_t portnum)
 {
  unsigned char auxIdport;           
  if (portnum >= (gb_max_portram-1))
+ {
+  if (cardputer_modem_port(portnum)) {
+   return cardputer_modem_read(portnum);
+  }
   return 0;
+ }
+ if (cardputer_modem_port(portnum)) {
+  return cardputer_modem_read(portnum);
+ }
 	//printf("portin(0x%X);\n", portnum);
 	switch (portnum) {
             case 0x71:

@@ -94,6 +94,9 @@ def emit_com() -> bytes:
     label("done_sound")
     call("speaker_off")
 
+    print_msg("modem_label")
+    call("modem_test")
+
     print_msg("usb_label")
     print_msg("done_msg")
     b(0xB8); w(0x4C00); b(0xCD, 0x21)
@@ -159,6 +162,46 @@ def emit_com() -> bytes:
     label("speaker_off")
     b(0xE4, 0x61, 0x24, 0xFC, 0xE6, 0x61, 0xC3)
 
+    label("modem_test")
+    b(0xB0, ord('A')); call("modem_send")
+    b(0xB0, ord('T')); call("modem_send")
+    b(0xB0, 0x0D); call("modem_send")
+    b(0xB9); w(0xFFFF)        # cx timeout
+    b(0x31, 0xDB)             # xor bx,bx; bl tracks seen 'O'
+    label("modem_wait")
+    b(0xBA); w(0x03FD)        # dx=LSR
+    b(0xEC, 0xA8, 0x01)       # in al,dx; test al,1
+    jz("modem_next")
+    b(0xBA); w(0x03F8)        # dx=RBR
+    b(0xEC)                   # in al,dx
+    b(0x3C, ord('O')); jz("modem_seen_o")
+    b(0x80, 0xFB, 0x01); jnz("modem_next")  # cmp bl,1
+    b(0x3C, ord('K')); jz("modem_ok")
+    label("modem_next")
+    loop("modem_wait")
+    print_msg("missing_msg")
+    b(0xC3)
+    label("modem_seen_o")
+    b(0xB3, 0x01)
+    jmp("modem_next")
+    label("modem_ok")
+    print_msg("present_msg")
+    b(0xC3)
+
+    label("modem_send")
+    b(0x50)                   # push ax
+    b(0xB9); w(0xFFFF)
+    label("modem_send_wait")
+    b(0xBA); w(0x03FD)
+    b(0xEC, 0xA8, 0x20)       # in al,dx; test al,20h
+    jnz("modem_send_ready")
+    loop("modem_send_wait")
+    b(0x58, 0xC3)             # pop ax; ret
+    label("modem_send_ready")
+    b(0x58)                   # pop ax
+    b(0xBA); w(0x03F8)
+    b(0xEE, 0xC3)             # out dx,al; ret
+
     label("delay_ticks")
     b(0x50, 0x52)
     label("delay_outer")
@@ -192,6 +235,8 @@ def emit_com() -> bytes:
     code.extend(b"\r\nASCII/scan low byte: 0x$")
     label("sound_label")
     code.extend(b"Speaker test: playing tones...\r\n$")
+    label("modem_label")
+    code.extend(b"Hayes modem COM1 AT probe: $")
     label("usb_label")
     code.extend(b"USB modes are selected from Settings.\r\n$")
     label("done_msg")

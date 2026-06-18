@@ -35,6 +35,7 @@
 #include "cardputer_power.h"
 #include "cardputer_rtc.h"
 #include "cardputer_settings.h"
+#include "cardputer_modem.h"
 #include "guest_memory.h"
 
 // ===============================================
@@ -175,6 +176,11 @@ void inithardware() {
     Serial.printf("  - Intel 8237 DMA controller: ");
 #endif
     init8237();
+#ifdef use_lib_log_serial
+    Serial.printf("OK\n");
+    Serial.printf("  - COM1 Hayes WiFi modem: ");
+#endif
+    cardputer_modem_init();
 #ifdef use_lib_log_serial
     Serial.printf("OK\n");
 #endif
@@ -518,6 +524,7 @@ void loop() {
     jj_ini_cpu = micros();
     static const uint32_t cpu_batch_instructions = 2000;
     exec86(cpu_batch_instructions);
+    cardputer_modem_poll();
     jj_end_cpu = micros();
     gb_cur_cpu_ticks = (jj_end_cpu - jj_ini_cpu);
     total_tiempo_ms_cpu = gb_cur_cpu_ticks / 1000;
