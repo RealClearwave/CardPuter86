@@ -39,7 +39,7 @@ La vista de texto predeterminada usa los [glifos Adafruit Classic 5x7](https://g
 
 ## Audio
 
-El PC Speaker se genera en una tarea FreeRTOS fijada al Core 0 y se envia a I2S DMA en bloques de 128 tramas estereo. La imagen predeterminada `cardputer86.img` elimina los juegos anteriores e incluye `CP86TEST.COM`, `MININASM.COM`, `TERM.COM`, `TE.COM` y `MUSIC.COM`.
+El PC Speaker se genera en una tarea FreeRTOS fijada al Core 0 y se envia a I2S DMA en bloques de 128 tramas estereo. La imagen predeterminada `cardputer86.img` elimina los juegos anteriores e incluye `CP86TEST.COM`, `MININASM.COM`, `TERM.COM`, `TE.COM` y `SB.COM`, el musicdisk System Beeps para PC speaker de Shiru. `SB.TXT` se incluye en el disco para la atribucion y el aviso de licencia CC BY 3.0.
 
 ## Imagenes de disco
 
