@@ -21,6 +21,12 @@ class Note:
     velocity: int
 
 
+@dataclass
+class TempoEvent:
+    tick: int
+    us_per_quarter: int
+
+
 def read_var(data: bytes, pos: int) -> tuple[int, int]:
     value = 0
     while True:
@@ -31,7 +37,21 @@ def read_var(data: bytes, pos: int) -> tuple[int, int]:
             return value, pos
 
 
-def parse_midi(path: Path) -> tuple[int, int, list[Note]]:
+def normalize_tempos(tempos: list[TempoEvent]) -> list[TempoEvent]:
+    if not tempos:
+        return [TempoEvent(0, 500000)]
+    result: list[TempoEvent] = []
+    for tempo in sorted(tempos, key=lambda item: item.tick):
+        if result and result[-1].tick == tempo.tick:
+            result[-1] = tempo
+        else:
+            result.append(tempo)
+    if result[0].tick > 0:
+        result.insert(0, TempoEvent(0, 500000))
+    return result
+
+
+def parse_midi(path: Path) -> tuple[int, list[TempoEvent], list[Note]]:
     data = path.read_bytes()
     pos = 0
     if data[pos:pos + 4] != b"MThd":
@@ -43,7 +63,7 @@ def parse_midi(path: Path) -> tuple[int, int, list[Note]]:
         raise ValueError("SMPTE MIDI timing is not supported")
     pos += 8 + header_len
     notes: list[Note] = []
-    tempo_us_per_quarter = 500000
+    tempos: list[TempoEvent] = []
     for _ in range(tracks):
         if data[pos:pos + 4] != b"MTrk":
             raise ValueError("missing track chunk")
@@ -71,7 +91,7 @@ def parse_midi(path: Path) -> tuple[int, int, list[Note]]:
                 payload = data[pos:pos + meta_len]
                 pos += meta_len
                 if meta_type == 0x51 and meta_len == 3:
-                    tempo_us_per_quarter = int.from_bytes(payload, "big")
+                    tempos.append(TempoEvent(tick, int.from_bytes(payload, "big")))
                 continue
             if status in (0xF0, 0xF7):
                 syx_len, pos = read_var(data, pos)
@@ -92,7 +112,7 @@ def parse_midi(path: Path) -> tuple[int, int, list[Note]]:
                 if started and tick > started[0]:
                     notes.append(Note(started[0], tick, p1, started[1]))
         pos = end
-    return division, tempo_us_per_quarter, sorted(notes, key=lambda n: (n.start, -n.velocity, -n.note))
+    return division, normalize_tempos(tempos), sorted(notes, key=lambda n: (n.start, -n.velocity, -n.note))
 
 
 def midi_note_to_divisor(note: int) -> int:
@@ -100,14 +120,40 @@ def midi_note_to_divisor(note: int) -> int:
     return max(1, min(0xFFFE, int(round(1193180.0 / freq))))
 
 
-def midi_ticks_to_bios_ticks(ticks: int, ppq: int, tempo_us_per_quarter: int) -> int:
+def midi_span_seconds(start_tick: int, end_tick: int, ppq: int,
+                      tempos: list[TempoEvent]) -> float:
+    if end_tick <= start_tick:
+        return 0.0
+    tempo_index = 0
+    while tempo_index + 1 < len(tempos) and tempos[tempo_index + 1].tick <= start_tick:
+        tempo_index += 1
+
+    seconds = 0.0
+    cursor = start_tick
+    while cursor < end_tick:
+        tempo = tempos[tempo_index]
+        next_tempo_tick = tempos[tempo_index + 1].tick if tempo_index + 1 < len(tempos) else end_tick
+        segment_end = min(end_tick, next_tempo_tick)
+        if segment_end > cursor:
+            seconds += (segment_end - cursor) * tempo.us_per_quarter / (ppq * 1000000.0)
+        cursor = segment_end
+        if tempo_index + 1 < len(tempos) and cursor >= tempos[tempo_index + 1].tick:
+            tempo_index += 1
+    return seconds
+
+
+def seconds_to_bios_ticks(seconds: float) -> int:
     # DOS BIOS timer ticks at about 18.2065 Hz. Rounding to this clock keeps the
     # music independent from the emulator's effective CPU speed.
-    seconds = (ticks * tempo_us_per_quarter) / (ppq * 1000000.0)
     return max(1, min(255, int(round(seconds * 18.2065))))
 
 
-def build_records(notes: list[Note], ppq: int, tempo_us_per_quarter: int,
+def midi_ticks_to_bios_ticks(start_tick: int, end_tick: int, ppq: int,
+                             tempos: list[TempoEvent]) -> int:
+    return seconds_to_bios_ticks(midi_span_seconds(start_tick, end_tick, ppq, tempos))
+
+
+def build_records(notes: list[Note], ppq: int, tempos: list[TempoEvent],
                   max_notes: int) -> list[tuple[int, int]]:
     selected: list[Note] = []
     cursor = 0
@@ -122,14 +168,14 @@ def build_records(notes: list[Note], ppq: int, tempo_us_per_quarter: int,
             break
 
     records: list[tuple[int, int]] = []
-    cursor = 0
+    cursor = selected[0].start if selected else 0
     for note in selected:
         if note.start > cursor:
             rest_units = midi_ticks_to_bios_ticks(
-                note.start - cursor, ppq, tempo_us_per_quarter)
+                cursor, note.start, ppq, tempos)
             records.append((0, rest_units))
         note_units = midi_ticks_to_bios_ticks(
-            note.end - note.start, ppq, tempo_us_per_quarter)
+            note.start, note.end, ppq, tempos)
         records.append((midi_note_to_divisor(note.note), note_units))
         cursor = note.end
     return records
@@ -251,8 +297,8 @@ def main() -> None:
     parser.add_argument("--write-com", type=Path, default=DEFAULT_COM)
     parser.add_argument("--max-notes", type=int, default=220)
     args = parser.parse_args()
-    ppq, tempo_us_per_quarter, notes = parse_midi(args.midi)
-    records = build_records(notes, ppq, tempo_us_per_quarter, args.max_notes)
+    ppq, tempos, notes = parse_midi(args.midi)
+    records = build_records(notes, ppq, tempos, args.max_notes)
     payload = emit_com(records)
     args.write_com.parent.mkdir(parents=True, exist_ok=True)
     args.write_com.write_bytes(payload)
