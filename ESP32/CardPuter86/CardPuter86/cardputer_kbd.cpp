@@ -108,6 +108,22 @@ void cardputer_kbd_fill_keymap(void) {
         if (sc) keymap[sc] = 0;
     }
 
+    // Opt combinations are CardPuter86 display controls. They should not leak
+    // as normal DOS keystrokes; Fn combinations remain emulator keys.
+    if (s.opt) {
+        if (s.space) keymap[PS2_KC_SPACE] = 1;
+        static const char display_keys[] = ";,./'";
+        static const uint8_t display_scancodes[] = {
+            PS2_KC_SEMI, PS2_KC_COMMA, PS2_KC_DOT, PS2_KC_DIV,
+            PS2_KC_APOS
+        };
+        for (uint8_t i = 0; i < 5; i++) {
+            if (M5Cardputer.Keyboard.isKeyPressed(display_keys[i])) {
+                keymap[display_scancodes[i]] = 1;
+            }
+        }
+    }
+
     // CardPuter86 function layer: Fn+1..0,-,= maps to F1..F12,
     // Fn+` maps to Esc, and Fn+Backspace maps to Delete.
     if (fn_layer) {
@@ -152,10 +168,6 @@ void cardputer_kbd_fill_keymap(void) {
             }
         }
 
-        if (cardputer_display_navigation_active()) {
-            if (cardputer_input_pressed(CARDPUTER_VK_HOME)) keymap[PS2_KC_APOS] = 1;
-            if (cardputer_input_pressed(CARDPUTER_VK_AUTO)) keymap[PS2_KC_SPACE] = 1;
-        }
         if (cardputer_input_pressed(CARDPUTER_VK_AUTO)) keymap[PS2_KC_SPACE] = 1;
     }
 

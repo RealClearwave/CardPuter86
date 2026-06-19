@@ -75,10 +75,9 @@ The M5Burner submission cover is available as [SVG](preview/cardputer86-cover.sv
 - `Fn` + `Backspace`: Delete
 - `Aa`: Shift. `Aa` + `` `1234567890-= `` sends `~!@#$%^&*()_+`.
 - `Ctrl`, `Alt`: corresponding PC modifier keys
-- `Fn` + `;`, `,`, `.`, `/`: PC cursor Up, Left, Down, and Right. In text viewport navigation these also scroll the 40x16 view.
-- `Fn` + `'`: return a FIXED viewport to its top-left starting position
+- `Fn` + `;`, `,`, `.`, `/`: PC cursor Up, Left, Down, and Right, sent directly to the emulator.
 - `Fn` + `Space`: pause the emulator and open Settings
-- `Opt`: switch between the default DSx86-style text mode and scaled mode. Text mode uses a readable 6x8 cell and supports viewport scrolling; scaled mode uses a 3x5 font for text screens and scales graphics screens to the full LCD.
+- `Opt+Space`: switch between the default DSx86-style text mode and scaled mode. Text mode uses a readable 6x8 cell and supports viewport scrolling; scaled mode uses a 3x5 font for text screens and scales graphics screens to the full LCD. `Opt+;`, `Opt+,`, `Opt+.`, and `Opt+/` scroll the text viewport up, left, down, and right; `Opt+'` returns a FIXED viewport to its top-left starting position.
 - `G0`: unused by the emulator power manager.
 
 The default text view uses the BSD-licensed [Adafruit Classic 5x7 glyphs](https://github.com/adafruit/Adafruit-GFX-Library/blob/master/glcdfont.c) in 6x8 cells. The scaled text view uses [Tom Thumb](https://opengameart.org/content/tom-thumb-tiny-ascii-font-3x5) by Robey Pointer, released under CC0.

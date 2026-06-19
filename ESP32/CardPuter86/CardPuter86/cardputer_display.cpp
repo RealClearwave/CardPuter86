@@ -25,7 +25,7 @@ enum CardputerDisplayMode {
 };
 
 static CardputerDisplayMode display_mode = DISPLAY_MODE_TEXT;
-static bool opt_was_pressed = false;
+static bool opt_space_was_pressed = false;
 static bool last_emulated_graphics_mode = false;
 static int text_view_col = 0;
 static int text_view_row = 0;
@@ -152,7 +152,7 @@ static void build_palette(const unsigned char *vga_colors, unsigned short int *r
 // ===============================================
 void cardputer_display_init(void) {
     display_mode = DISPLAY_MODE_TEXT;
-    opt_was_pressed = false;
+    opt_space_was_pressed = false;
     last_emulated_graphics_mode = false;
     text_view_col = 0;
     text_view_row = 0;
@@ -394,25 +394,25 @@ void cardputer_update(void) {
 
 void cardputer_display_update_mode_button(void) {
     const Keyboard_Class::KeysState &state = M5Cardputer.Keyboard.keysState();
-    const bool opt_pressed = state.opt;
-    if (opt_pressed && !opt_was_pressed) {
+    const bool opt_space_pressed = state.opt && state.space;
+    if (opt_space_pressed && !opt_space_was_pressed) {
         display_mode = display_mode == DISPLAY_MODE_TEXT
             ? DISPLAY_MODE_SCALED
             : DISPLAY_MODE_TEXT;
     }
-    opt_was_pressed = opt_pressed;
+    opt_space_was_pressed = opt_space_pressed;
 
     const bool navigation_active = cardputer_display_navigation_active();
-    const bool up_pressed = navigation_active &&
-        cardputer_input_pressed(CARDPUTER_VK_UP);
-    const bool down_pressed = navigation_active &&
-        cardputer_input_pressed(CARDPUTER_VK_DOWN);
-    const bool left_pressed = navigation_active &&
-        cardputer_input_pressed(CARDPUTER_VK_LEFT);
-    const bool right_pressed = navigation_active &&
-        cardputer_input_pressed(CARDPUTER_VK_RIGHT);
-    const bool home_pressed = navigation_active &&
-        cardputer_input_pressed(CARDPUTER_VK_HOME);
+    const bool up_pressed = navigation_active && state.opt &&
+        M5Cardputer.Keyboard.isKeyPressed(';');
+    const bool down_pressed = navigation_active && state.opt &&
+        M5Cardputer.Keyboard.isKeyPressed('.');
+    const bool left_pressed = navigation_active && state.opt &&
+        M5Cardputer.Keyboard.isKeyPressed(',');
+    const bool right_pressed = navigation_active && state.opt &&
+        M5Cardputer.Keyboard.isKeyPressed('/');
+    const bool home_pressed = navigation_active && state.opt &&
+        M5Cardputer.Keyboard.isKeyPressed('\'');
 
     const int source_cols = cols > 80 ? 80 : cols;
     const int source_rows = rows > 25 ? 25 : rows;
