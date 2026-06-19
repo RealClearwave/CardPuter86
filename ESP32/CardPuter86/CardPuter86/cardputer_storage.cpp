@@ -67,21 +67,77 @@ CardputerDiskImage gb_disk_image = {};
 CardputerDiskImage gb_disk_drives[CARDPUTER_DRIVE_COUNT] = {};
 static USBCDC usb_cdc;
 
+static void fit_status_text(char *buffer, size_t buffer_size, const char *text,
+                            int max_chars) {
+    if (!buffer || buffer_size == 0) return;
+    if (!text) text = "";
+    if (max_chars < 4) max_chars = 4;
+    snprintf(buffer, buffer_size, "%s", text);
+    const size_t len = strlen(buffer);
+    if ((int)len <= max_chars) return;
+    buffer[max_chars - 3] = '.';
+    buffer[max_chars - 2] = '.';
+    buffer[max_chars - 1] = '.';
+    buffer[max_chars] = '\0';
+}
+
+static void draw_cardputer86_logo(int center_x, int center_y) {
+    auto &display = M5Cardputer.Display;
+    const int logo_w = 132;
+    const int logo_h = 56;
+    const int x = center_x - logo_w / 2;
+    const int y = center_y - logo_h / 2;
+
+    display.fillRect(x + 4, y + 4, logo_w, logo_h, TFT_DARKGREY);
+    display.fillRect(x, y, logo_w, logo_h, TFT_BLACK);
+    display.drawRect(x, y, logo_w, logo_h, TFT_CYAN);
+    display.drawRect(x + 3, y + 3, logo_w - 6, logo_h - 6, TFT_BLUE);
+
+    display.setTextSize(2);
+    display.setTextColor(TFT_WHITE, TFT_BLACK);
+    display.setCursor(x + 16, y + 12);
+    display.print("Card");
+    display.setTextColor(TFT_ORANGE, TFT_BLACK);
+    display.print("86");
+
+    display.setTextSize(1);
+    display.setTextColor(TFT_CYAN, TFT_BLACK);
+    display.setCursor(x + 18, y + 34);
+    display.print("PC/XT ON CARDPUTER");
+
+    for (int i = 0; i < 6; ++i) {
+        const int px = x + 8 + i * 5;
+        display.fillRect(px, y + 47, 3, 3, (i & 1) ? TFT_ORANGE : TFT_CYAN);
+        display.fillRect(x + logo_w - 11 - i * 5, y + 47, 3, 3,
+                         (i & 1) ? TFT_CYAN : TFT_ORANGE);
+    }
+}
+
 static void show_probe_status(const char *status, const char *hint = nullptr) {
     auto &display = M5Cardputer.Display;
     display.fillScreen(TFT_BLACK);
-    display.fillRect(0, 0, display.width(), 16, TFT_BLUE);
+    display.fillRect(0, 0, display.width(), 12, TFT_BLUE);
     display.setTextSize(1);
     display.setTextColor(TFT_WHITE, TFT_BLUE);
-    display.setCursor(4, 4);
-    display.print("CardPuter86 storage POST");
-    display.setTextColor(TFT_WHITE, TFT_BLACK);
-    display.setCursor(6, 30);
-    display.print(status);
-    if (hint) {
-        display.setTextColor(TFT_YELLOW, TFT_BLACK);
-        display.setCursor(6, 48);
-        display.print(hint);
+    display.setCursor(4, 2);
+    display.print("CardPuter86 POST");
+
+    draw_cardputer86_logo(display.width() / 2, 62);
+
+    display.fillRect(0, display.height() - 19, display.width(), 19, TFT_NAVY);
+    display.drawFastHLine(0, display.height() - 20, display.width(), TFT_BLUE);
+
+    char line[48];
+    fit_status_text(line, sizeof(line), status, (display.width() - 8) / 6);
+    display.setTextColor(TFT_WHITE, TFT_NAVY);
+    display.setCursor(4, display.height() - 16);
+    display.print(line);
+
+    if (hint && hint[0]) {
+        fit_status_text(line, sizeof(line), hint, (display.width() - 8) / 6);
+        display.setTextColor(TFT_YELLOW, TFT_NAVY);
+        display.setCursor(4, display.height() - 8);
+        display.print(line);
     }
 }
 
@@ -711,61 +767,22 @@ bool cardputer_storage_init_and_select(void) {
 }
 
 void cardputer_storage_show_boot_status(void) {
-    auto &display = M5Cardputer.Display;
-    display.fillScreen(TFT_BLACK);
-    display.fillRect(0, 0, display.width(), 16, TFT_BLUE);
-    display.setTextSize(1);
-    display.setTextColor(TFT_WHITE, TFT_BLUE);
-    display.setCursor(4, 4);
-    display.print("CardPuter86 POST");
-
-    display.setTextColor(flash_detected ? TFT_GREEN : TFT_RED, TFT_BLACK);
-    display.setCursor(6, 24);
-    display.printf("Internal IMG partition: %s",
-                   flash_detected ? "ready" : "unavailable");
-
-    display.setTextColor(sd_detected ? TFT_GREEN : TFT_DARKGREY, TFT_BLACK);
-    display.setCursor(6, 37);
-    display.printf("SD card: %s", sd_detected ? "detected" : "not inserted");
-
-    display.setTextColor(guest_memory_512k_enabled() ? TFT_GREEN : TFT_YELLOW,
-                         TFT_BLACK);
-    display.setCursor(6, 50);
-    display.printf("Guest RAM: %s",
-                   guest_memory_512k_enabled() ? "512 KB" : "128 KB");
-
-    display.setTextColor(TFT_CYAN, TFT_BLACK);
-    display.setCursor(6, 63);
-    display.printf("CPU speed: %s",
-                   cardputer_cpu_profile_label(cardputer_cpu_profile()));
-
     if (gb_disk_image.mounted) {
-        display.setTextColor(TFT_CYAN, TFT_BLACK);
-        display.setCursor(6, 76);
-        display.printf("Boot source: %s",
-                       gb_disk_image.storage == CARDPUTER_STORAGE_FLASH ?
-                       "Internal Flash" : "SD card");
-        display.setTextColor(TFT_WHITE, TFT_BLACK);
-        display.setCursor(6, 89);
-        display.printf("Image: %.34s", base_name(gb_disk_image.path));
-        display.setCursor(6, 102);
-        display.printf("Size: %lu KB", (unsigned long)(gb_disk_image.size / 1024));
-        display.setCursor(6, 115);
-        display.printf("Emulated drive: %s",
-                       gb_disk_image.drive == 0x80 ? "C: hard disk" : "A: floppy");
-        display.setTextColor(TFT_GREEN, TFT_BLACK);
-        display.setCursor(150, 125);
-        display.print("Ready");
+        char status[64];
+        char hint[64];
+        snprintf(status, sizeof(status), "Booting %s from %s",
+                 base_name(gb_disk_image.path),
+                 gb_disk_image.storage == CARDPUTER_STORAGE_FLASH ?
+                 "flash" : "SD");
+        snprintf(hint, sizeof(hint), "%s %luKB RAM %s",
+                 gb_disk_image.drive == 0x80 ? "C:" : "A:",
+                 (unsigned long)(guest_memory_512k_enabled() ? 512 : 128),
+                 cardputer_cpu_profile_label(cardputer_cpu_profile()));
+        show_probe_status(status, hint);
         delay(1200);
     } else {
-        display.setTextColor(TFT_RED, TFT_BLACK);
-        display.setCursor(6, 66);
-        display.print("No bootable IMG found");
-        display.setTextColor(TFT_WHITE, TFT_BLACK);
-        display.setCursor(6, 84);
-        display.print("Use storage import workflow");
-        display.setCursor(6, 97);
-        display.print("then reboot with an IMG");
+        show_probe_status("ERROR: No bootable IMG found",
+                          "Use USB disk import, then reboot");
         delay(2500);
     }
 }
