@@ -31,7 +31,7 @@ def read_var(data: bytes, pos: int) -> tuple[int, int]:
             return value, pos
 
 
-def parse_midi(path: Path) -> tuple[int, list[Note]]:
+def parse_midi(path: Path) -> tuple[int, int, list[Note]]:
     data = path.read_bytes()
     pos = 0
     if data[pos:pos + 4] != b"MThd":
@@ -43,6 +43,7 @@ def parse_midi(path: Path) -> tuple[int, list[Note]]:
         raise ValueError("SMPTE MIDI timing is not supported")
     pos += 8 + header_len
     notes: list[Note] = []
+    tempo_us_per_quarter = 500000
     for _ in range(tracks):
         if data[pos:pos + 4] != b"MTrk":
             raise ValueError("missing track chunk")
@@ -64,9 +65,13 @@ def parse_midi(path: Path) -> tuple[int, list[Note]]:
             else:
                 raise ValueError("running status without previous event")
             if status == 0xFF:
+                meta_type = data[pos]
                 pos += 1
                 meta_len, pos = read_var(data, pos)
+                payload = data[pos:pos + meta_len]
                 pos += meta_len
+                if meta_type == 0x51 and meta_len == 3:
+                    tempo_us_per_quarter = int.from_bytes(payload, "big")
                 continue
             if status in (0xF0, 0xF7):
                 syx_len, pos = read_var(data, pos)
@@ -87,7 +92,7 @@ def parse_midi(path: Path) -> tuple[int, list[Note]]:
                 if started and tick > started[0]:
                     notes.append(Note(started[0], tick, p1, started[1]))
         pos = end
-    return division, sorted(notes, key=lambda n: (n.start, -n.velocity, -n.note))
+    return division, tempo_us_per_quarter, sorted(notes, key=lambda n: (n.start, -n.velocity, -n.note))
 
 
 def midi_note_to_divisor(note: int) -> int:
@@ -95,7 +100,15 @@ def midi_note_to_divisor(note: int) -> int:
     return max(1, min(0xFFFE, int(round(1193180.0 / freq))))
 
 
-def build_records(notes: list[Note], ppq: int, max_notes: int) -> list[tuple[int, int]]:
+def midi_ticks_to_bios_ticks(ticks: int, ppq: int, tempo_us_per_quarter: int) -> int:
+    # DOS BIOS timer ticks at about 18.2065 Hz. Rounding to this clock keeps the
+    # music independent from the emulator's effective CPU speed.
+    seconds = (ticks * tempo_us_per_quarter) / (ppq * 1000000.0)
+    return max(1, min(255, int(round(seconds * 18.2065))))
+
+
+def build_records(notes: list[Note], ppq: int, tempo_us_per_quarter: int,
+                  max_notes: int) -> list[tuple[int, int]]:
     selected: list[Note] = []
     cursor = 0
     for note in notes:
@@ -109,13 +122,14 @@ def build_records(notes: list[Note], ppq: int, max_notes: int) -> list[tuple[int
             break
 
     records: list[tuple[int, int]] = []
-    unit_ticks = max(1, ppq // 8)
     cursor = 0
     for note in selected:
         if note.start > cursor:
-            rest_units = max(1, min(48, round((note.start - cursor) / unit_ticks)))
+            rest_units = midi_ticks_to_bios_ticks(
+                note.start - cursor, ppq, tempo_us_per_quarter)
             records.append((0, rest_units))
-        note_units = max(1, min(48, round((note.end - note.start) / unit_ticks)))
+        note_units = midi_ticks_to_bios_ticks(
+            note.end - note.start, ppq, tempo_us_per_quarter)
         records.append((midi_note_to_divisor(note.note), note_units))
         cursor = note.end
     return records
@@ -188,18 +202,19 @@ def emit_com(records: list[tuple[int, int]]) -> bytes:
     b(0xE4, 0x61, 0x24, 0xFC, 0xE6, 0x61, 0xC3)
 
     label("delay_units")
-    b(0x50, 0x53, 0x51, 0x52)
+    b(0x50, 0x53, 0x51, 0x52, 0x56) # save ax,bx,cx,dx,si
     b(0x09, 0xC9); jz("delay_done")
-    label("delay_outer")
-    b(0xBB); w(2)
-    label("delay_mid")
-    b(0xBA); w(0xFFFF)
-    label("delay_inner")
-    b(0x4A); jnz("delay_inner")
-    b(0x4B); jnz("delay_mid")
-    b(0xE2); patches.append((len(code), "delay_outer", "rel8")); b(0)
+    b(0x89, 0xCE)                   # mov si,cx (requested BIOS ticks)
+    b(0xB4, 0x00, 0xCD, 0x1A)       # BIOS get timer ticks, CX:DX
+    b(0x89, 0xD3)                   # mov bx,dx (start low word)
+    label("delay_wait")
+    b(0xB4, 0x00, 0xCD, 0x1A)
+    b(0x89, 0xD0)                   # mov ax,dx
+    b(0x29, 0xD8)                   # sub ax,bx
+    b(0x39, 0xF0)                   # cmp ax,si
+    b(0x72); patches.append((len(code), "delay_wait", "rel8")); b(0)
     label("delay_done")
-    b(0x5A, 0x59, 0x5B, 0x58, 0xC3)
+    b(0x5E, 0x5A, 0x59, 0x5B, 0x58, 0xC3)
 
     label("title")
     code.extend(b"\r\nMUSIC.COM - Phantom Ensemble speaker demo\r\nPress Ctrl+C to stop.\r\n$")
@@ -236,8 +251,8 @@ def main() -> None:
     parser.add_argument("--write-com", type=Path, default=DEFAULT_COM)
     parser.add_argument("--max-notes", type=int, default=220)
     args = parser.parse_args()
-    ppq, notes = parse_midi(args.midi)
-    records = build_records(notes, ppq, args.max_notes)
+    ppq, tempo_us_per_quarter, notes = parse_midi(args.midi)
+    records = build_records(notes, ppq, tempo_us_per_quarter, args.max_notes)
     payload = emit_com(records)
     args.write_com.parent.mkdir(parents=True, exist_ok=True)
     args.write_com.write_bytes(payload)
