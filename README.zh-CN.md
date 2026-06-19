@@ -96,7 +96,7 @@ M5Burner 投稿封面提供 [SVG 矢量版](preview/cardputer86-cover.svg) 和 [
 
 PC Speaker 音频由固定在 Core 0 的 FreeRTOS 任务生成，并以 128 个立体声帧为一批写入 I2S DMA。这样 PIT 2 方波不再依赖显示刷新节奏，8086 模拟主循环仍保留在 Arduino 核心。
 
-默认 `cardputer86.img` 以原 tinyfake86 兼容系统盘为基础，删除了内置游戏，并加入 `CP86TEST.COM`、`MININASM.COM`、`TERM.COM`、`TE.COM`、`MMLPLAY.COM` 和 `PHANTOM.MML`。在 DOS 下运行 `CP86TEST` 可统一测试 RTC、BIOS 时钟 tick、磁盘枚举、键盘、扬声器、COM1 modem、Wi-Fi modem 状态和 USB 模式提示；运行 `TERM` 可直接和 COM1 Hayes modem 交互；运行 `MMLPLAY PHANTOM.MML` 可播放 PC speaker 音乐示例。
+默认 `cardputer86.img` 以原 tinyfake86 兼容系统盘为基础，删除了内置游戏，并加入 `CP86TEST.COM`、`MININASM.COM`、`TERM.COM`、`TE.COM` 和 `MUSIC.COM`。在 DOS 下运行 `CP86TEST` 可统一测试 RTC、BIOS 时钟 tick、磁盘枚举、键盘、扬声器、COM1 modem、Wi-Fi modem 状态和 USB 模式提示；运行 `TERM` 可直接和 COM1 Hayes modem 交互；运行 `TE FILE.TXT` 可使用 40×14 缓冲的 nano 风格小编辑器；运行 `MUSIC` 可播放内嵌 PC speaker 音乐示例。
 
 ## Hayes Wi-Fi Modem
 

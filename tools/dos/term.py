@@ -52,11 +52,6 @@ def emit_com() -> bytes:
     b(0xB4, 0x00, 0xCD, 0x16)  # read key
     b(0x3C, 0x1B); jz("quit")
     call("send_al")
-    b(0x3C, 0x0D); jnz("echo_key")
-    b(0xB0, 0x0A); call("putch")
-    b(0xB0, 0x0D)
-    label("echo_key")
-    call("putch")
     jmp("main_loop")
     label("quit")
     print_msg("bye")
@@ -101,7 +96,7 @@ def emit_com() -> bytes:
     b(0x52, 0x88, 0xC2, 0xB4, 0x02, 0xCD, 0x21, 0x5A, 0xC3)
 
     label("title")
-    code.extend(b"TERM.COM - COM1 Hayes terminal. ESC quits.\r\n$")
+    code.extend(b"TERM.COM - COM1 Hayes terminal. Remote echo only. ESC quits.\r\n$")
     label("bye")
     code.extend(b"\r\nBye.\r\n$")
 
